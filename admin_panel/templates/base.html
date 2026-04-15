@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}IT Admin Panel{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; background: #f4f6f9; color: #333; font-size: 14px; }
+
+    /* ── Nav ─────────────────────────────────────────────────────── */
+    nav {
+      background: #1e293b; color: #fff;
+      padding: 0 24px;
+      display: flex; align-items: center; height: 52px;
+    }
+    nav .brand {
+      font-size: 17px; font-weight: 700; color: #fff;
+      letter-spacing: -.3px; margin-right: 32px; text-decoration: none;
+    }
+    nav a {
+      color: #94a3b8; text-decoration: none;
+      padding: 8px 14px; border-radius: 5px;
+      font-size: 13.5px; transition: all .15s;
+    }
+    nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
+    nav .spacer { flex: 1; }
+    nav .logout { color: #f87171; }
+    nav .logout:hover { background: rgba(248,113,113,.12); color: #fca5a5; }
+
+    /* ── Container ───────────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 28px auto; padding: 0 20px; }
+
+    /* ── Alerts ──────────────────────────────────────────────────── */
+    .alert {
+      padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;
+      font-size: 13.5px; border: 1px solid transparent;
+    }
+    .alert-success { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .alert-error   { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+    .alert-info    { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+
+    /* ── Card ────────────────────────────────────────────────────── */
+    .card {
+      background: #fff; border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      padding: 24px; margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 16px; font-weight: 700; color: #1e293b;
+      margin-bottom: 18px; padding-bottom: 12px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────────── */
+    .btn {
+      display: inline-block; padding: 8px 18px; border-radius: 5px;
+      border: none; cursor: pointer; font-size: 13.5px; font-weight: 600;
+      text-decoration: none; transition: all .15s; line-height: 1.4;
+    }
+    .btn-primary  { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-danger   { background: #ef4444; color: #fff; }
+    .btn-danger:hover  { background: #dc2626; }
+    .btn-success  { background: #22c55e; color: #fff; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-warning  { background: #f59e0b; color: #fff; }
+    .btn-warning:hover { background: #d97706; }
+    .btn-ghost {
+      background: transparent; border: 1px solid #cbd5e1; color: #475569;
+    }
+    .btn-ghost:hover { background: #f8fafc; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* ── Table ───────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      padding: 10px 14px; text-align: left;
+      background: #f8fafc; color: #475569;
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; border-bottom: 2px solid #e2e8f0;
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* ── Badges ──────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; letter-spacing: .3px;
+    }
+    .badge-active   { background: #dcfce7; color: #15803d; }
+    .badge-inactive { background: #fee2e2; color: #b91c1c; }
+    .badge-admin    { background: #ede9fe; color: #6d28d9; }
+    .badge-employee { background: #dbeafe; color: #1d4ed8; }
+    .badge-contractor{ background: #fef9c3; color: #854d0e; }
+    .badge-guest    { background: #f1f5f9; color: #475569; }
+
+    /* ── Forms ───────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 18px; }
+    label {
+      display: block; margin-bottom: 6px;
+      font-weight: 600; color: #374151; font-size: 13.5px;
+    }
+    input[type=text], input[type=email], input[type=password], select, textarea {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid #d1d5db; border-radius: 5px;
+      font-size: 13.5px; font-family: inherit; color: #1f2937;
+      background: #fff; transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,.1);
+    }
+    input::placeholder { color: #9ca3af; }
+
+    /* ── Stats grid ──────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 16px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #fff; border-radius: 8px;
+      border: 1px solid #e2e8f0; padding: 20px; text-align: center;
+    }
+    .stat-num  { font-size: 34px; font-weight: 800; color: #4f46e5; line-height: 1.1; }
+    .stat-label{ font-size: 12px; color: #94a3b8; font-weight: 600;
+                 text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .page-header h1 { font-size: 20px; font-weight: 700; color: #1e293b; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="brand" href="/">IT Admin Panel</a>
+    <a href="/">Dashboard</a>
+    <a href="/users">Users</a>
+    <a href="/users/create">Create User</a>
+    <span class="spacer"></span>
+    <a href="/logout" class="logout">Logout</a>
+  </nav>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

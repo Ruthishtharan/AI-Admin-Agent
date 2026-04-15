@@ -11,13 +11,8 @@ def create_app():
     from app.models import init_db
     init_db()
 
-    # Cache DB reads once per request using Flask's g object
-    from app.models import load_users, load_profile
-
-    def _cached_load_users():
-        if not hasattr(g, "_users"):
-            g._users = load_users()
-        return g._users
+    # Cache profile per request
+    from app.models import load_profile
 
     def _cached_load_profile():
         if not hasattr(g, "_profile"):
@@ -26,7 +21,7 @@ def create_app():
 
     @app.context_processor
     def inject_globals():
-        return {"load_users": _cached_load_users, "load_profile": _cached_load_profile}
+        return {"load_profile": _cached_load_profile}
 
     register_routes(app)
 

@@ -62,11 +62,44 @@
     background:var(--th-bg); border-bottom:1px solid var(--border);
   }
   /* Step type styling */
-  .step-TOOL   { color:#818cf8; }
-  .step-RESULT { color:#34d399; }
-  .step-THINK  { color:var(--muted); font-style:italic; }
-  .step-ERROR  { color:var(--danger); }
-  .step-COMPLETE,.step-DONE { color:#34d399; font-weight:600; }
+  .step-NAVIGATE { color:#60a5fa; }
+  .step-READ     { color:#a78bfa; }
+  .step-CLICK    { color:#f59e0b; }
+  .step-TYPE     { color:#34d399; }
+  .step-SELECT   { color:#34d399; }
+  .step-COMPLETE { color:#34d399; font-weight:700; }
+  .step-TOOL     { color:#818cf8; }
+  .step-RESULT   { color:#34d399; }
+  .step-THINK    { color:var(--muted); font-style:italic; }
+  .step-ERROR    { color:var(--danger); }
+  .step-DONE     { color:#34d399; font-weight:600; }
+
+  /* Screenshot preview in chat */
+  .screenshot-msg {
+    margin: 6px 0; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); max-width: 100%;
+  }
+  .screenshot-msg img {
+    width: 100%; display: block; border-radius: 7px;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .screenshot-msg img:hover { opacity: .9; }
+  .screenshot-label {
+    font-size: 10px; color: var(--muted); padding: 3px 8px;
+    background: var(--th-bg); border-top: 1px solid var(--border);
+  }
+
+  /* Watch-browser modal */
+  .watch-modal-card {
+    background: var(--card); border-radius: 16px; padding: 28px;
+    max-width: 380px; width: 90%; border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    animation: slideUp .25s ease; text-align: center;
+  }
+  .watch-modal-icon { font-size: 36px; margin-bottom: 12px; }
+  .watch-modal-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .watch-modal-sub   { font-size: 13px; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+  .watch-modal-btns  { display: flex; gap: 10px; justify-content: center; }
 
   .chat-msg { padding:4px 0; border-bottom:1px solid var(--border-2); }
   .chat-msg:last-child { border-bottom:none; }
@@ -222,6 +255,24 @@
   </div>
 </div>
 
+<!-- Watch-browser modal (hidden) -->
+<div id="watchModal" style="display:none">
+  <div class="modal-backdrop" onclick="if(event.target===this)resolveWatch(false)">
+    <div class="watch-modal-card">
+      <div class="watch-modal-icon">👁</div>
+      <div class="watch-modal-title">Watch Vexa work?</div>
+      <div class="watch-modal-sub">
+        You've used Vexa more than 6 times.<br>
+        Should I open a browser window so you can watch me navigate the admin panel?
+      </div>
+      <div class="watch-modal-btns">
+        <button class="btn btn-primary" onclick="resolveWatch(true)">Yes, show me</button>
+        <button class="btn btn-ghost" onclick="resolveWatch(false)">No, run silently</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Feedback modal (hidden) -->
 <div id="feedbackModal" style="display:none">
   <div class="modal-backdrop" onclick="if(event.target===this)closeFeedback()">
@@ -249,10 +300,13 @@
 </div>
 
 <script>
-// ── History ───────────────────────────────────────────────────────────────────
+// ── History ────────────────────────────────────────────────────────────────────
 const HISTORY_KEY = 'it_agent_history';
-function loadHistory() { try{return JSON.parse(localStorage.getItem(HISTORY_KEY))||[];}catch{return[];} }
-function saveHistory(i){ localStorage.setItem(HISTORY_KEY,JSON.stringify(i.slice(0,20))); }
+const DRAFT_KEY   = 'it_agent_draft';
+const COUNT_KEY   = 'vexa_task_count';
+
+function loadHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY))||[];}catch{return[];}}
+function saveHistory(i){localStorage.setItem(HISTORY_KEY,JSON.stringify(i.slice(0,20)));}
 function renderHistory(){
   const items=loadHistory(),el=document.getElementById('historyList');
   if(!items.length){el.innerHTML='<p style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0">No tasks yet</p>';return;}
@@ -268,63 +322,100 @@ function renderHistory(){
 function addHistory(task){const i=loadHistory();i.unshift({task,time:new Date().toLocaleTimeString()});saveHistory(i);renderHistory();}
 function clearHistory(){localStorage.removeItem(HISTORY_KEY);renderHistory();}
 renderHistory();
-// Restore draft if user navigated away mid-type
+
+// Restore draft
 (function(){
-  const draft=localStorage.getItem('it_agent_draft');
-  if(draft){ document.getElementById('taskInput').value=draft; }
+  const draft=localStorage.getItem(DRAFT_KEY);
+  if(draft) document.getElementById('taskInput').value=draft;
 })();
 
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-const DRAFT_KEY = 'it_agent_draft';
+
 function setTask(t){
   const inp=document.getElementById('taskInput');
   inp.value=t;
   localStorage.setItem(DRAFT_KEY,t);
   inp.focus();
-  // flash border so user sees it loaded
   inp.style.borderColor='var(--accent)';
   inp.style.boxShadow='0 0 0 3px rgba(99,102,241,.2)';
   setTimeout(()=>{inp.style.borderColor='';inp.style.boxShadow='';},900);
 }
 
+// ── Task counter & browser-watch logic ────────────────────────────────────────
+function getTaskCount(){return parseInt(localStorage.getItem(COUNT_KEY)||'0');}
+function incTaskCount(){localStorage.setItem(COUNT_KEY, getTaskCount()+1);}
+
+let _watchResolve = null;
+
+function resolveWatch(show){
+  document.getElementById('watchModal').style.display='none';
+  if(_watchResolve){ _watchResolve(show); _watchResolve=null; }
+}
+
+function askWatchBrowser(){
+  return new Promise(res=>{
+    _watchResolve=res;
+    document.getElementById('watchModal').style.display='';
+  });
+}
+
+async function shouldShowBrowser(){
+  const count=getTaskCount();
+  if(count < 6) return true;       // first 6: always show
+  return await askWatchBrowser();  // after 6: ask each time
+}
+
 // ── Loading messages ──────────────────────────────────────────────────────────
-const LOADING_MSGS = [
+const LOADING_MSGS=[
   '🔐 Logging into admin panel…',
-  '🤔 Analyzing your request…',
   '🧭 Navigating to the right page…',
   '📝 Filling in the details…',
-  '⚡ Executing action…',
+  '⚡ Executing the action…',
   '🔍 Verifying the result…',
   '🚀 Almost done…',
+  '🤖 Vexa is working on it…',
 ];
-let loadingInterval = null;
-let loadingIdx = 0;
+let loadingInterval=null,loadingIdx=0;
 function startLoadingCycle(){
-  loadingIdx = 0;
-  document.getElementById('agentSubtitle').textContent = LOADING_MSGS[0];
-  loadingInterval = setInterval(()=>{
-    loadingIdx = (loadingIdx+1) % LOADING_MSGS.length;
-    document.getElementById('agentSubtitle').textContent = LOADING_MSGS[loadingIdx];
-  }, 2800);
+  loadingIdx=0;
+  document.getElementById('agentSubtitle').textContent=LOADING_MSGS[0];
+  loadingInterval=setInterval(()=>{
+    loadingIdx=(loadingIdx+1)%LOADING_MSGS.length;
+    document.getElementById('agentSubtitle').textContent=LOADING_MSGS[loadingIdx];
+  },2800);
 }
 function stopLoadingCycle(){
   clearInterval(loadingInterval);
-  document.getElementById('agentSubtitle').textContent = 'Vexa is ready to execute your IT tasks';
+  document.getElementById('agentSubtitle').textContent='Vexa is ready to execute your IT tasks in real time';
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function setAgentBusy(busy){
-  document.getElementById('statusDot').className = 'agent-status-dot' + (busy?' busy':'');
-  document.getElementById('pulseRing').style.display = busy ? 'none' : '';
+  document.getElementById('statusDot').className='agent-status-dot'+(busy?' busy':'');
+  document.getElementById('pulseRing').style.display=busy?'none':'';
 }
 
-function appendMsg(role, text, cssClass, extra=''){
+function appendMsg(role,text,extra=''){
   const box=document.getElementById('chatBox');
   const div=document.createElement('div');
-  div.className='chat-msg '+(extra||cssClass);
-  div.innerHTML='<span class="role step-'+role+'">'+escHtml(role)+':</span> <span>'+escHtml(text)+'</span>';
-  box.appendChild(div);
-  box.scrollTop=box.scrollHeight;
+  div.className='chat-msg '+(extra||'system');
+  div.innerHTML='<span class="role step-'+escHtml(role)+'">'+escHtml(role)+':</span> <span>'+escHtml(text)+'</span>';
+  box.appendChild(div); box.scrollTop=box.scrollHeight;
+}
+
+function appendScreenshot(b64){
+  const box=document.getElementById('chatBox');
+  const wrap=document.createElement('div');
+  wrap.className='screenshot-msg';
+  const img=document.createElement('img');
+  img.src='data:image/png;base64,'+b64;
+  img.alt='Browser screenshot';
+  img.onclick=()=>{ window.open(img.src,'_blank'); };
+  const lbl=document.createElement('div');
+  lbl.className='screenshot-label';
+  lbl.textContent='Browser view';
+  wrap.appendChild(img); wrap.appendChild(lbl);
+  box.appendChild(wrap); box.scrollTop=box.scrollHeight;
 }
 
 function showTyping(){
@@ -334,31 +425,40 @@ function showTyping(){
   el.innerHTML='<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
   box.appendChild(el); box.scrollTop=box.scrollHeight;
 }
-function hideTyping(){ const el=document.getElementById('typingIndicator'); if(el) el.remove(); }
+function hideTyping(){const el=document.getElementById('typingIndicator');if(el)el.remove();}
 
-// ── SSE send ──────────────────────────────────────────────────────────────────
-let lastTask = '';
+// ── Step icon map ─────────────────────────────────────────────────────────────
+const STEP_ICONS={
+  NAVIGATE:'🌐', READ:'👁', CLICK:'🖱', TYPE:'⌨', SELECT:'📋',
+  COMPLETE:'✅', TOOL:'⚙', RESULT:'📦', ERROR:'❌', DONE:'✅',
+};
+
+// ── Main send function ────────────────────────────────────────────────────────
+let lastTask='';
 async function sendTask(){
   const input=document.getElementById('taskInput');
   const btn=document.getElementById('sendBtn');
   const task=input.value.trim();
   if(!task) return;
 
-  lastTask = task;
+  // Decide whether to show the browser window
+  const showBrowser = await shouldShowBrowser();
+
+  lastTask=task;
   input.disabled=true; btn.disabled=true; btn.textContent='Running…';
 
   appendMsg('You', task, 'user');
   addHistory(task);
   input.value='';
-  localStorage.removeItem('it_agent_draft');
+  localStorage.removeItem(DRAFT_KEY);
   setAgentBusy(true);
   startLoadingCycle();
   showTyping();
 
-  try {
+  try{
     const res=await fetch('/api/chat',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({task}),
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({task, show_browser: showBrowser}),
     });
     if(!res.ok){
       hideTyping();
@@ -366,7 +466,8 @@ async function sendTask(){
       appendMsg('Error','❌ '+(err.error||'Unknown error'),'error');
       return;
     }
-    const reader=res.body.getReader(),decoder=new TextDecoder();
+
+    const reader=res.body.getReader(), decoder=new TextDecoder();
     let buffer='';
     while(true){
       const {value,done}=await reader.read();
@@ -377,19 +478,35 @@ async function sendTask(){
         if(!line.startsWith('data: ')) continue;
         try{
           const ev=JSON.parse(line.slice(6));
-          if(ev.type==='step' && ev.step!=='START'){
-            hideTyping();
+
+          if(ev.type==='step'){
             const step=ev.step;
-            let cssExtra='';
-            if(step==='TOOL')    cssExtra='tool-msg';
-            if(step==='RESULT')  cssExtra='result-msg';
-            if(step==='ERROR')   cssExtra='error';
-            appendMsg(step, ev.message, 'system', cssExtra);
+            if(step==='START') continue;
+
+            // Screenshots render as images, not text
+            if(step==='SCREENSHOT'){
+              hideTyping();
+              appendScreenshot(ev.message);
+              showTyping();
+              continue;
+            }
+
+            hideTyping();
+            const icon=STEP_ICONS[step]||'•';
+            let extraCls='';
+            if(step==='NAVIGATE') extraCls='tool-msg';
+            if(step==='CLICK'||step==='TYPE'||step==='SELECT') extraCls='tool-msg';
+            if(step==='COMPLETE'||step==='DONE') extraCls='result-msg';
+            if(step==='ERROR') extraCls='error';
+            appendMsg(icon+' '+step, ev.message, extraCls);
             showTyping();
+
           } else if(ev.type==='done'){
             hideTyping();
-            appendMsg('Done','✅ '+ev.result,'agent');
+            appendMsg('✅ Done', ev.result, 'result-msg');
+            incTaskCount();
             setTimeout(showFeedback, 800);
+
           } else if(ev.type==='error'){
             hideTyping();
             appendMsg('Error','❌ '+ev.error,'error');
@@ -397,10 +514,10 @@ async function sendTask(){
         }catch{}
       }
     }
-  } catch(err){
+  }catch(err){
     hideTyping();
     appendMsg('Error','❌ '+err.message,'error');
-  } finally {
+  }finally{
     input.disabled=false; btn.disabled=false; btn.textContent='▶ Run';
     setAgentBusy(false); stopLoadingCycle();
     input.focus();
@@ -408,27 +525,25 @@ async function sendTask(){
 }
 
 // ── Feedback modal ────────────────────────────────────────────────────────────
-let selectedRating = 0;
+let selectedRating=0;
 function showFeedback(){
-  document.getElementById('feedbackTaskPreview').textContent =
-    'Task: "' + lastTask.slice(0,60) + (lastTask.length>60?'…':'') + '"';
-  selectedRating = 0;
+  document.getElementById('feedbackTaskPreview').textContent=
+    'Task: "'+lastTask.slice(0,60)+(lastTask.length>60?'…':'')+'"';
+  selectedRating=0;
   document.querySelectorAll('.star').forEach(s=>s.classList.remove('selected'));
   document.getElementById('feedbackComment').value='';
   document.getElementById('feedbackModal').style.display='';
 }
-function closeFeedback(){ document.getElementById('feedbackModal').style.display='none'; }
+function closeFeedback(){document.getElementById('feedbackModal').style.display='none';}
 function rateStar(n){
   selectedRating=n;
-  document.querySelectorAll('.star').forEach((s,i)=>{
-    s.classList.toggle('selected', i<n);
-  });
+  document.querySelectorAll('.star').forEach((s,i)=>s.classList.toggle('selected',i<n));
 }
 async function submitFeedback(){
   if(!selectedRating){closeFeedback();return;}
   await fetch('/api/feedback',{
     method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({rating:selectedRating, comment:document.getElementById('feedbackComment').value, task:lastTask}),
+    body:JSON.stringify({rating:selectedRating,comment:document.getElementById('feedbackComment').value,task:lastTask}),
   }).catch(()=>{});
   closeFeedback();
 }

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — IT Admin Panel{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <a href="/users/create" class="btn btn-primary">+ Create New User</a>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ total }}</div>
+    <div class="stat-label">Total Users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#22c55e">{{ active }}</div>
+    <div class="stat-label">Active</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#ef4444">{{ inactive }}</div>
+    <div class="stat-label">Inactive</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#8b5cf6">{{ admins }}</div>
+    <div class="stat-label">Admins</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Recent Users</div>
+  {% if recent %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Department</th>
+        <th>Role</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in recent %}
+      <tr>
+        <td><strong>{{ user['name'] }}</strong></td>
+        <td>{{ user['email'] }}</td>
+        <td>{{ user['department'] or '—' }}</td>
+        <td><span class="badge badge-{{ user['role'] }}">{{ user['role'] }}</span></td>
+        <td><span class="badge badge-{{ user['status'] }}">{{ user['status'] }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#94a3b8;text-align:center;padding:20px 0">No users yet.</p>
+  {% endif %}
+  <div style="margin-top:16px">
+    <a href="/users" class="btn btn-ghost btn-sm">View All Users →</a>
+  </div>
+</div>
+
+{% endblock %}

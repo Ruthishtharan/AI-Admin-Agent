@@ -459,18 +459,6 @@
   </a>
 
   <nav>
-    <div class="nav-section">Main</div>
-    <a href="/"            {% if request.path == '/'            %}class="active"{% endif %}>
-      <span class="nav-inner"><span class="nav-icon">◈</span> Dashboard</span>
-    </a>
-    <a href="/users"       {% if request.path == '/users'       %}class="active"{% endif %}>
-      <span class="nav-inner"><span class="nav-icon">◎</span> Users</span>
-      <span class="nav-badge green">{{ load_users()|length }}</span>
-    </a>
-    <a href="/create-user" {% if request.path == '/create-user' %}class="active"{% endif %}>
-      <span class="nav-inner"><span class="nav-icon">⊕</span> Create User</span>
-    </a>
-
     <div class="nav-section">Vexa</div>
     <a href="/chat" {% if request.path == '/chat' %}class="active"{% endif %}>
       <span class="nav-inner">
@@ -479,15 +467,17 @@
       </span>
     </a>
 
-    <div class="nav-section">Admin</div>
-    <a href="/audit"    {% if request.path == '/audit'    %}class="active"{% endif %}>
-      <span class="nav-inner"><span class="nav-icon">≡</span> Audit Log</span>
+    <div class="nav-section">Settings</div>
+    <a href="/profile"  {% if request.path == '/profile'  %}class="active"{% endif %}>
+      <span class="nav-inner"><span class="nav-icon">◎</span> Profile</span>
     </a>
     <a href="/feedback" {% if request.path == '/feedback' %}class="active"{% endif %}>
       <span class="nav-inner"><span class="nav-icon">★</span> Feedback</span>
     </a>
-    <a href="/export-csv">
-      <span class="nav-inner"><span class="nav-icon">↓</span> Export CSV</span>
+
+    <div class="nav-section">Admin Panel</div>
+    <a href="http://127.0.0.1:5001" target="_blank">
+      <span class="nav-inner"><span class="nav-icon">⊡</span> Open Panel ↗</span>
     </a>
   </nav>
 
@@ -545,7 +535,7 @@ function toggleTheme() {
 // ── First-time Tour ────────────────────────────────────────────────────────
 const TOUR_STEPS = [
   { icon:'⚡', title:'Welcome to IT Admin Panel', body:'Your all-in-one IT management console. Manage users, licenses, and let Vexa — your AI agent — do the heavy lifting.' },
-  { icon:'◎', title:'User Management', body:'Create, disable, enable and delete users from the Users page. Search, bulk-select, and export to CSV.' },
+  { icon:'⊡', title:'Admin Panel', body:'The IT Admin Panel runs separately at port 5001. Click "Open Panel ↗" in the sidebar to view it, or just give Vexa a task.' },
   { icon:'✦', title:'Meet Vexa', body:'Type any IT task in plain English — like "Create user Alice in Engineering with E3 license" — and Vexa handles it automatically in the browser.' },
   { icon:'◈', title:'Dashboard & Audit', body:'The dashboard gives you a live overview. The Audit Log records every action taken — by you or by Vexa.' },
   { icon:'★', title:'You\'re all set!', body:'Use the theme toggle (🌙) in the bottom-left to switch between light and dark mode. Click your profile to update your details.' },

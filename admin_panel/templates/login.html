@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — IT Admin Panel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f4f6f9; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-wrap {
+      background: #fff; border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      width: 380px; padding: 40px;
+    }
+    .login-brand {
+      font-size: 22px; font-weight: 800; color: #1e293b;
+      text-align: center; margin-bottom: 6px;
+    }
+    .login-sub {
+      text-align: center; color: #64748b; font-size: 13px; margin-bottom: 28px;
+    }
+    label {
+      display: block; font-weight: 600; color: #374151;
+      font-size: 13.5px; margin-bottom: 6px;
+    }
+    input[type=password] {
+      width: 100%; padding: 10px 14px;
+      border: 1.5px solid #d1d5db; border-radius: 5px;
+      font-size: 14px; color: #1f2937; margin-bottom: 20px;
+    }
+    input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+    input::placeholder { color: #9ca3af; }
+    button[type=submit] {
+      width: 100%; padding: 10px; background: #4f46e5; color: #fff;
+      border: none; border-radius: 5px; font-size: 15px;
+      font-weight: 700; cursor: pointer; transition: background .15s;
+    }
+    button[type=submit]:hover { background: #4338ca; }
+    .error-msg {
+      background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;
+      padding: 10px 14px; border-radius: 5px; font-size: 13px; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-brand">IT Admin Panel</div>
+    <div class="login-sub">Sign in to manage users</div>
+
+    {% if error %}
+      <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+      <label for="password">Admin Password</label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        placeholder="Enter admin password"
+        autofocus
+      >
+      <button type="submit">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

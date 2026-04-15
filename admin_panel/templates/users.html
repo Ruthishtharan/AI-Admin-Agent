@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Users — IT Admin Panel{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>All Users ({{ users|length }})</h1>
+  <a href="/users/create" class="btn btn-primary">+ Create New User</a>
+</div>
+
+<div class="card">
+  {% if users %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Department</th>
+        <th>Role</th>
+        <th>License</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td><strong>{{ user['name'] }}</strong></td>
+        <td>{{ user['email'] }}</td>
+        <td>{{ user['department'] or '—' }}</td>
+        <td><span class="badge badge-{{ user['role'] }}">{{ user['role'] }}</span></td>
+        <td style="font-size:12px;color:#64748b">{{ user['license'] }}</td>
+        <td><span class="badge badge-{{ user['status'] }}">{{ user['status'] }}</span></td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            {% if user['status'] == 'active' %}
+            <form method="POST" action="/users/{{ user['email'] }}/disable" style="display:inline">
+              <button type="submit" class="btn btn-warning btn-sm">Disable</button>
+            </form>
+            {% else %}
+            <form method="POST" action="/users/{{ user['email'] }}/enable" style="display:inline">
+              <button type="submit" class="btn btn-success btn-sm">Enable</button>
+            </form>
+            {% endif %}
+            <form method="POST" action="/users/{{ user['email'] }}/reset-password" style="display:inline">
+              <button type="submit" class="btn btn-ghost btn-sm">Reset Password</button>
+            </form>
+            <form method="POST" action="/users/{{ user['email'] }}/delete"
+                  style="display:inline"
+                  onsubmit="return confirm('Delete {{ user['name'] }}? This cannot be undone.')">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#94a3b8;text-align:center;padding:40px 0;font-size:15px">
+    No users yet. <a href="/users/create" style="color:#4f46e5">Create the first one →</a>
+  </p>
+  {% endif %}
+</div>
+
+{% endblock %}

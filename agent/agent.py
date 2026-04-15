@@ -1,17 +1,27 @@
+"""
+Vexa agent — navigates the IT Admin Panel like a human using a real browser.
+
+Key design:
+  - NO direct database shortcuts.  Every action goes through the browser.
+  - show_browser=True  → headed Chromium window opens on screen (first 6 tasks)
+  - show_browser=False → headless (user chose to hide the window)
+  - Screenshots are captured after each action and streamed to the chat UI
+    so the user can always see what's happening, even in headless mode.
+"""
+
 import json
+import base64
 from typing import Callable, Optional
 from openai import OpenAI
 
 from config.settings import (
     ANTHROPIC_API_KEY, GROQ_API_KEY,
     LLM_BACKEND, OLLAMA_URL, OLLAMA_MODEL,
-    BASE_URL, ADMIN_PASSWORD,
+    ADMIN_PANEL_URL, ADMIN_PANEL_PASSWORD,
 )
-from agent.prompts import SYSTEM_PROMPT
+from agent.prompts import build_system_prompt
 
-# ---------------------------------------------------------------------------
-# LLM client setup
-# ---------------------------------------------------------------------------
+# ── LLM client setup ──────────────────────────────────────────────────────────
 
 _USE_ANTHROPIC = False
 _USE_GROQ      = False
@@ -33,135 +43,19 @@ else:
     _ollama_client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
 
 
-# ---------------------------------------------------------------------------
-# Tool definitions
-# ---------------------------------------------------------------------------
+# ── Tool definitions ──────────────────────────────────────────────────────────
+# The LLM only has browser tools — it must navigate like a human.
 
 TOOLS_OPENAI = [
-    # ── Direct admin tools (instant, no browser) ──────────────────────────
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_create_user",
-            "description": "Create a new user directly in the database. Use this for ALL create user tasks.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email":      {"type": "string", "description": "User email address"},
-                    "name":       {"type": "string", "description": "Full name"},
-                    "role":       {"type": "string", "description": "employee | admin | contractor | guest", "default": "employee"},
-                    "department": {"type": "string", "description": "Department (Engineering, HR, IT, Marketing, etc.)"},
-                    "license":    {"type": "string", "description": "License (None, Microsoft 365 E1/E3/E5, Google Workspace Basic/Business)", "default": "None"},
-                },
-                "required": ["email", "name"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_find_user",
-            "description": "Look up a user by their email address.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email": {"type": "string", "description": "Email address to look up"},
-                },
-                "required": ["email"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_list_users",
-            "description": "List all users in the system.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_disable_user",
-            "description": "Disable a user account.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email": {"type": "string"},
-                },
-                "required": ["email"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_enable_user",
-            "description": "Enable a disabled user account.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email": {"type": "string"},
-                },
-                "required": ["email"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_delete_user",
-            "description": "Permanently delete a user account.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email": {"type": "string"},
-                },
-                "required": ["email"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_reset_password",
-            "description": "Reset a user's password.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email": {"type": "string"},
-                },
-                "required": ["email"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "admin_assign_license",
-            "description": "Assign a license and/or role to a user.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email":   {"type": "string"},
-                    "license": {"type": "string", "description": "License type"},
-                    "role":    {"type": "string", "description": "Role (optional)"},
-                },
-                "required": ["email", "license"],
-            },
-        },
-    },
-
-    # ── Browser tools (external websites only) ────────────────────────────
     {
         "type": "function",
         "function": {
             "name": "navigate",
-            "description": "Navigate browser to a URL. Only use for external websites, NOT for admin panel tasks.",
+            "description": "Go to a URL in the browser.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string"},
+                    "url": {"type": "string", "description": "Full URL to navigate to"},
                 },
                 "required": ["url"],
             },
@@ -171,35 +65,34 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "read_page",
-            "description": "Read the current browser page content.",
+            "description": "Read the current page's visible text and URL. Use this to understand where you are and what options are available.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "fill_input",
-            "description": "Fill a text input field.",
+            "name": "click",
+            "description": "Click any visible element — button, link, or text — by its exact visible label.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "label_or_placeholder": {"type": "string"},
-                    "value":               {"type": "string"},
+                    "text": {"type": "string", "description": "The visible text on the element to click"},
                 },
-                "required": ["label_or_placeholder", "value"],
+                "required": ["text"],
             },
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "select_option",
-            "description": "Select a dropdown option.",
+            "name": "fill_input",
+            "description": "Type a value into a form field, found by its label text or placeholder.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "label": {"type": "string"},
-                    "value": {"type": "string"},
+                    "label": {"type": "string", "description": "The label or placeholder text of the input field"},
+                    "value": {"type": "string", "description": "The value to type"},
                 },
                 "required": ["label", "value"],
             },
@@ -208,28 +101,15 @@ TOOLS_OPENAI = [
     {
         "type": "function",
         "function": {
-            "name": "click_button",
-            "description": "Click a button by visible text.",
+            "name": "select_option",
+            "description": "Select an option in a dropdown, found by its label.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "text": {"type": "string"},
+                    "label": {"type": "string", "description": "The label text of the dropdown/select field"},
+                    "value": {"type": "string", "description": "The option text or value to select"},
                 },
-                "required": ["text"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "click_link",
-            "description": "Click a link by visible text.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string"},
-                },
-                "required": ["text"],
+                "required": ["label", "value"],
             },
         },
     },
@@ -237,11 +117,11 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "task_complete",
-            "description": "Call when the task is fully done.",
+            "description": "Call this when the task is fully done. Provide a clear human-readable summary.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "summary": {"type": "string"},
+                    "summary": {"type": "string", "description": "What was accomplished"},
                 },
                 "required": ["summary"],
             },
@@ -251,353 +131,269 @@ TOOLS_OPENAI = [
 
 TOOLS_ANTHROPIC = [
     {
-        "name": t["function"]["name"],
-        "description": t["function"]["description"],
+        "name":         t["function"]["name"],
+        "description":  t["function"]["description"],
         "input_schema": t["function"]["parameters"],
     }
     for t in TOOLS_OPENAI
 ]
 
 
-# ---------------------------------------------------------------------------
-# Lazy browser — only opens if a browser tool is actually called
-# ---------------------------------------------------------------------------
+# ── Browser login helper ──────────────────────────────────────────────────────
 
-class _LazyBrowser:
-    def __init__(self):
-        self._ctrl = None
-
-    def get(self):
-        if self._ctrl is None:
-            from browser.browser_controller import BrowserController
-            self._ctrl = BrowserController()
-            _auto_login(self._ctrl)
-        return self._ctrl
-
-    def close(self):
-        if self._ctrl:
-            try:
-                self._ctrl.close()
-            except Exception:
-                pass
-
-
-def _auto_login(browser) -> None:
-    """Authenticate the Playwright browser on the admin panel."""
+def _ensure_logged_in(browser) -> None:
+    """Navigate to admin panel and log in if the login page is showing."""
     import time
     try:
-        browser.go_to(f"{BASE_URL}/login")
-        time.sleep(0.3)
-        if "/login" not in browser.get_current_url():
-            return
-        browser._page.get_by_placeholder("Enter admin password").fill(ADMIN_PASSWORD)
-        browser._page.get_by_role("button", name="Sign In").click()
-        try:
-            browser._page.wait_for_url(lambda url: "/login" not in url, timeout=6000)
-        except Exception:
-            time.sleep(1.5)
+        current = browser.get_current_url()
+        if "login" in current or current in ("about:blank", ""):
+            browser.go_to(f"{ADMIN_PANEL_URL}/login")
+            time.sleep(0.4)
+        # If login page, authenticate
+        page_text = browser.get_page_text()
+        if "Admin Password" in page_text or "Sign In" in page_text:
+            browser.fill_input("Admin Password", ADMIN_PANEL_PASSWORD)
+            browser.click("Sign In")
+            time.sleep(0.8)
     except Exception:
         pass
 
 
-# ---------------------------------------------------------------------------
-# Direct admin tool execution (no browser needed)
-# ---------------------------------------------------------------------------
+# ── Tool executor ─────────────────────────────────────────────────────────────
 
-def _execute_direct_tool(name: str, inputs: dict) -> str:
-    from app.models import (
-        create_user as _create_user,
-        find_user as _find_user,
-        load_users as _load_users,
-        disable_user as _disable_user,
-        enable_user as _enable_user,
-        delete_user as _delete_user,
-        reset_password as _reset_password,
-        assign_license as _assign_license,
-        assign_role as _assign_role,
-        user_exists as _user_exists,
-    )
-
-    if name == "admin_create_user":
-        email = inputs.get("email", "").strip().lower()
-        uname = inputs.get("name", "").strip()
-        if not email or not uname:
-            return "Error: email and name are required."
-        if _user_exists(email):
-            return f"User {email} already exists — skipping creation."
-        user = _create_user(
-            email, uname,
-            inputs.get("role", "employee"),
-            inputs.get("department", ""),
-            inputs.get("license", "None"),
-        )
-        return (
-            f"✅ Created user: {user['name']} ({email}) "
-            f"| Role: {user['role']} | Dept: {user.get('department','—')} "
-            f"| License: {user.get('license','None')}"
-        )
-
-    elif name == "admin_find_user":
-        user = _find_user(inputs.get("email", ""))
-        if not user:
-            return f"User '{inputs.get('email','')}' not found."
-        return (
-            f"Found: {user['name']} ({user['email']}) "
-            f"| {user['role']} in {user.get('department','—')} "
-            f"| Status: {user['status']} | License: {user.get('license','None')}"
-        )
-
-    elif name == "admin_list_users":
-        users = _load_users()
-        if not users:
-            return "No users in the system."
-        return "\n".join(
-            f"- {u['name']} ({u['email']}) [{u['status']}] {u['role']} / {u.get('department','—')}"
-            for u in users
-        )
-
-    elif name == "admin_disable_user":
-        ok = _disable_user(inputs.get("email", ""))
-        return "✅ User disabled." if ok else "User not found."
-
-    elif name == "admin_enable_user":
-        ok = _enable_user(inputs.get("email", ""))
-        return "✅ User enabled." if ok else "User not found."
-
-    elif name == "admin_delete_user":
-        ok = _delete_user(inputs.get("email", ""))
-        return "✅ User deleted permanently." if ok else "User not found."
-
-    elif name == "admin_reset_password":
-        ok = _reset_password(inputs.get("email", ""))
-        return "✅ Password reset successfully." if ok else "User not found."
-
-    elif name == "admin_assign_license":
-        email = inputs.get("email", "")
-        ok = _assign_license(email, inputs.get("license", "None"))
-        if inputs.get("role"):
-            _assign_role(email, inputs["role"])
-        return f"✅ License/role updated for {email}." if ok else "User not found."
-
-    return f"Unknown direct tool: {name}"
-
-
-# ---------------------------------------------------------------------------
-# Browser tool execution
-# ---------------------------------------------------------------------------
-
-def _execute_browser_tool(browser, name: str, inputs: dict) -> str:
+def _execute_tool(browser, name: str, inputs: dict) -> str:
     try:
         if name == "navigate":
-            browser.go_to(inputs["url"])
-            return f"Navigated to {inputs['url']}"
+            url = inputs["url"]
+            # If navigating to admin panel root without path, go to dashboard
+            if url in (ADMIN_PANEL_URL, ADMIN_PANEL_URL + "/"):
+                url = f"{ADMIN_PANEL_URL}/"
+            browser.go_to(url)
+            return f"Navigated to {url}"
+
         elif name == "read_page":
-            return f"[URL]: {browser.get_current_url()}\n\n[PAGE]:\n{browser.get_page_text()}"
+            url  = browser.get_current_url()
+            text = browser.get_page_text()
+            return f"[URL]: {url}\n\n[PAGE CONTENT]:\n{text[:3000]}"
+
+        elif name == "click":
+            return browser.click(inputs["text"])
+
         elif name == "fill_input":
-            return browser.fill_input(inputs["label_or_placeholder"], inputs["value"])
+            return browser.fill_input(inputs["label"], inputs["value"])
+
         elif name == "select_option":
             return browser.select_option(inputs["label"], inputs["value"])
-        elif name == "click_button":
-            return browser.click_button(inputs["text"])
-        elif name == "click_link":
-            return browser.click_link(inputs["text"])
+
+        elif name == "task_complete":
+            return f"TASK_COMPLETE: {inputs.get('summary', 'Done.')}"
+
         else:
-            return f"Unknown browser tool: {name}"
+            return f"Unknown tool: {name}"
+
     except Exception as e:
         return f"Error in {name}: {e}"
 
 
-# ---------------------------------------------------------------------------
-# Unified tool dispatcher
-# ---------------------------------------------------------------------------
-
-_DIRECT_TOOLS = {
-    "admin_create_user", "admin_find_user", "admin_list_users",
-    "admin_disable_user", "admin_enable_user", "admin_delete_user",
-    "admin_reset_password", "admin_assign_license",
-}
-
-
-def _execute_tool(lazy_browser: _LazyBrowser, name: str, inputs: dict) -> str:
-    if name in _DIRECT_TOOLS:
-        return _execute_direct_tool(name, inputs)
-    if name == "task_complete":
-        return f"TASK_COMPLETE: {inputs.get('summary', 'Done.')}"
-    # Browser tools
-    return _execute_browser_tool(lazy_browser.get(), name, inputs)
-
-
-# ---------------------------------------------------------------------------
-# OpenAI-compatible agent loop (Groq / Ollama)
-# ---------------------------------------------------------------------------
+# ── OpenAI-compatible agent loop (Groq / Ollama) ─────────────────────────────
 
 def _run_openai_compatible(
     client: OpenAI,
     model: str,
     task: str,
-    log,
-    lazy_browser: _LazyBrowser,
-    prompt: str = None,
+    log: Callable,
+    browser,
+    max_steps: int = 20,
 ) -> str:
+    system = build_system_prompt(ADMIN_PANEL_URL, ADMIN_PANEL_PASSWORD)
     messages = [
-        {"role": "system", "content": prompt or SYSTEM_PROMPT},
-        {"role": "user",   "content": task},
+        {"role": "system",  "content": system},
+        {"role": "user",    "content": task},
     ]
-    result = "Task could not be completed."
 
-    for _ in range(20):
+    for step in range(max_steps):
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             tools=TOOLS_OPENAI,
             tool_choice="auto",
-            max_tokens=1024,
+            temperature=0,
         )
+        msg = response.choices[0].message
 
-        msg    = response.choices[0].message
-        finish = response.choices[0].finish_reason
+        # No tool call → natural language response (shouldn't happen much)
+        if not msg.tool_calls:
+            content = msg.content or "Task complete."
+            log("DONE", content)
+            return content
 
-        assistant_entry: dict = {"role": "assistant", "content": msg.content or ""}
-        if msg.tool_calls:
-            assistant_entry["tool_calls"] = [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                }
-                for tc in msg.tool_calls
-            ]
-        messages.append(assistant_entry)
+        # Process each tool call
+        messages.append({"role": "assistant", "content": msg.content, "tool_calls": [
+            {"id": tc.id, "type": "function",
+             "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+            for tc in msg.tool_calls
+        ]})
 
-        if msg.content:
-            log("THINK", msg.content)
-
-        if finish == "stop" or not msg.tool_calls:
-            result = msg.content or "Task completed."
-            log("DONE", result)
-            break
-
-        tool_results = []
         for tc in msg.tool_calls:
-            name = tc.function.name
+            fn_name = tc.function.name
             try:
-                args = json.loads(tc.function.arguments)
+                fn_args = json.loads(tc.function.arguments)
             except Exception:
-                args = {}
+                fn_args = {}
 
-            log("TOOL", f"{name}({args})")
+            # Log the tool call
+            if fn_name == "navigate":
+                log("NAVIGATE", f"Going to {fn_args.get('url','')}")
+            elif fn_name == "read_page":
+                log("READ", "Reading page content…")
+            elif fn_name == "click":
+                log("CLICK", f"Clicking \"{fn_args.get('text','')}\"")
+            elif fn_name == "fill_input":
+                log("TYPE", f"Filling \"{fn_args.get('label','')}\" → \"{fn_args.get('value','')}\"")
+            elif fn_name == "select_option":
+                log("SELECT", f"Selecting \"{fn_args.get('value','')}\" in \"{fn_args.get('label','')}\"")
+            elif fn_name == "task_complete":
+                log("COMPLETE", fn_args.get("summary", "Done."))
+            else:
+                log("TOOL", fn_name)
 
-            if name == "task_complete":
-                result = args.get("summary", "Task completed.")
-                log("COMPLETE", result)
-                return result
+            result = _execute_tool(browser, fn_name, fn_args)
 
-            tool_result = _execute_tool(lazy_browser, name, args)
-            short = tool_result[:400] + "…" if len(tool_result) > 400 else tool_result
-            log("RESULT", short)
+            # After every browser action, capture and stream a screenshot
+            if fn_name not in ("task_complete", "read_page"):
+                try:
+                    shot = browser.screenshot_base64()
+                    if shot:
+                        log("SCREENSHOT", shot)
+                except Exception:
+                    pass
 
-            tool_results.append({
+            if fn_name == "task_complete":
+                return fn_args.get("summary", "Done.")
+
+            messages.append({
                 "role":         "tool",
                 "tool_call_id": tc.id,
-                "content":      tool_result,
+                "content":      result,
             })
 
-        messages.extend(tool_results)
-
-    return result
+    return "Task reached maximum steps."
 
 
-# ---------------------------------------------------------------------------
-# Anthropic agent loop
-# ---------------------------------------------------------------------------
+# ── Anthropic agent loop ──────────────────────────────────────────────────────
 
-def _run_anthropic(
-    task: str, log, lazy_browser: _LazyBrowser, prompt: str = None
-) -> str:
+def _run_anthropic(task: str, log: Callable, browser, max_steps: int = 20) -> str:
+    import anthropic as _ant
+
+    system = build_system_prompt(ADMIN_PANEL_URL, ADMIN_PANEL_PASSWORD)
     messages = [{"role": "user", "content": task}]
-    result   = "Task could not be completed."
 
-    for _ in range(20):
+    for step in range(max_steps):
         response = _anthropic_client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=prompt or SYSTEM_PROMPT,
+            max_tokens=4096,
+            system=system,
             tools=TOOLS_ANTHROPIC,
             messages=messages,
         )
 
+        tool_uses = [b for b in response.content if b.type == "tool_use"]
+        text_blocks = [b for b in response.content if b.type == "text"]
+
+        if not tool_uses:
+            result = text_blocks[0].text if text_blocks else "Done."
+            log("DONE", result)
+            return result
+
         messages.append({"role": "assistant", "content": response.content})
+        tool_results = []
 
-        if response.stop_reason == "end_turn":
-            for block in response.content:
-                if hasattr(block, "text") and block.text:
-                    result = block.text
-                    log("DONE", result)
-            break
+        for tu in tool_uses:
+            fn_name = tu.name
+            fn_args = tu.input or {}
 
-        if response.stop_reason == "tool_use":
-            tool_results = []
-            for block in response.content:
-                if block.type == "text" and block.text:
-                    log("THINK", block.text)
-                elif block.type == "tool_use":
-                    log("TOOL", f"{block.name}({block.input})")
+            if fn_name == "navigate":
+                log("NAVIGATE", f"Going to {fn_args.get('url','')}")
+            elif fn_name == "click":
+                log("CLICK", f"Clicking \"{fn_args.get('text','')}\"")
+            elif fn_name == "fill_input":
+                log("TYPE", f"Filling \"{fn_args.get('label','')}\" → \"{fn_args.get('value','')}\"")
+            elif fn_name == "select_option":
+                log("SELECT", f"Selecting \"{fn_args.get('value','')}\" in \"{fn_args.get('label','')}\"")
+            elif fn_name == "task_complete":
+                log("COMPLETE", fn_args.get("summary", "Done."))
+            else:
+                log("TOOL", fn_name)
 
-                    if block.name == "task_complete":
-                        result = block.input.get("summary", "Task completed.")
-                        log("COMPLETE", result)
-                        tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
-                        messages.append({"role": "user", "content": tool_results})
-                        return result
+            result = _execute_tool(browser, fn_name, fn_args)
 
-                    tool_result = _execute_tool(lazy_browser, block.name, block.input)
-                    short = tool_result[:400] + "…" if len(tool_result) > 400 else tool_result
-                    log("RESULT", short)
-                    tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": tool_result})
+            if fn_name not in ("task_complete", "read_page"):
+                try:
+                    shot = browser.screenshot_base64()
+                    if shot:
+                        log("SCREENSHOT", shot)
+                except Exception:
+                    pass
 
-            messages.append({"role": "user", "content": tool_results})
+            if fn_name == "task_complete":
+                return fn_args.get("summary", "Done.")
 
-    return result
+            tool_results.append({
+                "type":        "tool_result",
+                "tool_use_id": tu.id,
+                "content":     result,
+            })
+
+        messages.append({"role": "user", "content": tool_results})
+
+    return "Task reached maximum steps."
 
 
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
+# ── Public entry point ────────────────────────────────────────────────────────
 
 def run_agent(
     task: str,
-    progress_callback: Optional[Callable[[str, str], None]] = None,
-    system_prompt: Optional[str] = None,
-    start_url: Optional[str] = None,
+    progress_callback: Optional[Callable] = None,
+    show_browser: bool = True,
 ) -> str:
+    """
+    Run Vexa on the given task.
+
+    show_browser=True  → headed Chromium window (user watches on screen)
+    show_browser=False → headless (silent, only chat steps shown)
+    """
+
     def log(step: str, message: str):
-        print(f"[{step}] {message}")
         if progress_callback:
             progress_callback(step, message)
+        else:
+            icon = {
+                "NAVIGATE": "🌐", "READ": "👁", "CLICK": "🖱",
+                "TYPE": "⌨", "SELECT": "📋", "COMPLETE": "✅",
+                "SCREENSHOT": None,
+            }.get(step, "•")
+            if icon:
+                print(f"  {icon} [{step}] {message}")
 
-    if _USE_ANTHROPIC:
-        backend = "Anthropic (claude-sonnet-4-6)"
-    elif _USE_GROQ:
-        backend = f"Groq ({_GROQ_MODEL})"
-    else:
-        backend = f"Ollama ({OLLAMA_MODEL})"
+    from browser.browser_controller import BrowserController
 
-    log("START", f"Task: {task}  |  Backend: {backend}")
+    # headed=True means Chromium opens visibly; headless=True means hidden
+    browser = BrowserController(headless=not show_browser)
 
-    lazy_browser = _LazyBrowser()
     try:
-        if start_url:
-            lazy_browser.get().go_to(start_url)
+        # Start at the admin panel login page
+        log("NAVIGATE", f"Opening admin panel at {ADMIN_PANEL_URL}")
+        browser.go_to(f"{ADMIN_PANEL_URL}/login")
+        shot = browser.screenshot_base64()
+        if shot:
+            log("SCREENSHOT", shot)
 
         if _USE_ANTHROPIC:
-            return _run_anthropic(task, log, lazy_browser, system_prompt)
+            return _run_anthropic(task, log, browser)
         elif _USE_GROQ:
-            return _run_openai_compatible(_groq_client, _GROQ_MODEL, task, log, lazy_browser, system_prompt)
+            return _run_openai_compatible(_groq_client, _GROQ_MODEL, task, log, browser)
         else:
-            return _run_openai_compatible(_ollama_client, OLLAMA_MODEL, task, log, lazy_browser, system_prompt)
+            return _run_openai_compatible(_ollama_client, OLLAMA_MODEL, task, log, browser)
 
-    except Exception as e:
-        log("ERROR", str(e))
-        return f"Error: {e}"
     finally:
-        lazy_browser.close()
+        browser.close()
