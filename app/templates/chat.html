@@ -199,6 +199,7 @@
       <div class="chat-input-bar">
         <input type="text" id="taskInput"
                placeholder="e.g. Create user Alice Chen in Engineering with E3 license…"
+               oninput="localStorage.setItem('it_agent_draft',this.value)"
                onkeypress="if(event.key==='Enter') sendTask()">
         <button class="btn btn-primary" onclick="sendTask()" id="sendBtn">
           ▶ Run
@@ -255,18 +256,36 @@ function saveHistory(i){ localStorage.setItem(HISTORY_KEY,JSON.stringify(i.slice
 function renderHistory(){
   const items=loadHistory(),el=document.getElementById('historyList');
   if(!items.length){el.innerHTML='<p style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0">No tasks yet</p>';return;}
-  el.innerHTML=items.map(h=>`
-    <div class="history-item" onclick="setTask(${JSON.stringify(h.task)})">
-      <span class="history-ts">${h.time}</span>
-      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(h.task)}</div>
-    </div>`).join('');
+  el.innerHTML='';
+  items.forEach(h=>{
+    const div=document.createElement('div');
+    div.className='history-item';
+    div.innerHTML=`<span class="history-ts">${h.time}</span><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(h.task)}</div>`;
+    div.addEventListener('click',()=>setTask(h.task));
+    el.appendChild(div);
+  });
 }
 function addHistory(task){const i=loadHistory();i.unshift({task,time:new Date().toLocaleTimeString()});saveHistory(i);renderHistory();}
 function clearHistory(){localStorage.removeItem(HISTORY_KEY);renderHistory();}
 renderHistory();
+// Restore draft if user navigated away mid-type
+(function(){
+  const draft=localStorage.getItem('it_agent_draft');
+  if(draft){ document.getElementById('taskInput').value=draft; }
+})();
 
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function setTask(t){document.getElementById('taskInput').value=t;document.getElementById('taskInput').focus();}
+const DRAFT_KEY = 'it_agent_draft';
+function setTask(t){
+  const inp=document.getElementById('taskInput');
+  inp.value=t;
+  localStorage.setItem(DRAFT_KEY,t);
+  inp.focus();
+  // flash border so user sees it loaded
+  inp.style.borderColor='var(--accent)';
+  inp.style.boxShadow='0 0 0 3px rgba(99,102,241,.2)';
+  setTimeout(()=>{inp.style.borderColor='';inp.style.boxShadow='';},900);
+}
 
 // ── Loading messages ──────────────────────────────────────────────────────────
 const LOADING_MSGS = [
@@ -331,6 +350,7 @@ async function sendTask(){
   appendMsg('You', task, 'user');
   addHistory(task);
   input.value='';
+  localStorage.removeItem('it_agent_draft');
   setAgentBusy(true);
   startLoadingCycle();
   showTyping();
