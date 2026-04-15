@@ -253,7 +253,7 @@ def register_routes(app):
         def run():
             try:
                 result = run_agent(task, progress_callback=progress_callback)
-                _audit("ai_task", details=task[:200], actor="AI Agent")
+                _audit("ai_task", details=task[:200], actor="Vexa")
                 q.put({"type": "done", "result": result})
             except Exception as e:
                 q.put({"type": "error", "error": str(e)})

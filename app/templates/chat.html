@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}AI Agent - IT Admin Panel{% endblock %}
+{% block title %}Vexa - IT Admin Panel{% endblock %}
 {% block content %}
 <style>
   .chat-page {
@@ -171,10 +171,10 @@
       </div>
       <div class="chat-title">
         <div style="display:flex;align-items:center;gap:8px">
-          <h2>AI IT Agent</h2>
-          <span class="agent-tag">Llama 4 · Groq</span>
+          <h2>Vexa</h2>
+          <span class="agent-tag">AI · Llama 4 · Groq</span>
         </div>
-        <p id="agentSubtitle">Ready to execute IT tasks in real time</p>
+        <p id="agentSubtitle">Vexa is ready to execute your IT tasks in real time</p>
       </div>
     </div>
 
@@ -193,7 +193,7 @@
       <div class="chat-messages" id="chatBox">
         <div class="chat-msg system">
           <span class="role">System: </span>
-          <span>Ready. Type an IT task below and the AI agent will execute it automatically.</span>
+          <span>Hi, I'm Vexa. Type an IT task below and I'll execute it automatically.</span>
         </div>
       </div>
       <div class="chat-input-bar">
@@ -290,7 +290,7 @@ function startLoadingCycle(){
 }
 function stopLoadingCycle(){
   clearInterval(loadingInterval);
-  document.getElementById('agentSubtitle').textContent = 'Ready to execute IT tasks in real time';
+  document.getElementById('agentSubtitle').textContent = 'Vexa is ready to execute your IT tasks';
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────

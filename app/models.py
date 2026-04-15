@@ -181,7 +181,7 @@ def bulk_delete(emails: list[str]) -> int:
 
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
-def _audit(action: str, target: str = None, details: str = None, actor: str = "AI Agent"):
+def _audit(action: str, target: str = None, details: str = None, actor: str = "Vexa"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _db() as conn:
         conn.execute(
