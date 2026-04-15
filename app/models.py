@@ -1,155 +1,195 @@
-import json
+import sqlite3
 import os
 from datetime import datetime
+from contextlib import contextmanager
 
-DATA_FILE = "data/users.json"
+# ── Paths ─────────────────────────────────────────────────────────────────────
+_HERE    = os.path.dirname(os.path.abspath(__file__))
+DB_PATH  = os.path.join(_HERE, "..", "data", "users.db")
 
-DEFAULT_USERS = [
-    {
-        "email": "john.doe@company.com",
-        "name": "John Doe",
-        "role": "employee",
-        "department": "Engineering",
-        "status": "active",
-        "license": "Microsoft 365 E3",
-        "created_at": "2024-01-10",
-        "password_reset_at": None,
-    },
-    {
-        "email": "jane.smith@company.com",
-        "name": "Jane Smith",
-        "role": "admin",
-        "department": "IT",
-        "status": "active",
-        "license": "Microsoft 365 E5",
-        "created_at": "2023-06-15",
-        "password_reset_at": None,
-    },
-    {
-        "email": "bob.johnson@company.com",
-        "name": "Bob Johnson",
-        "role": "contractor",
-        "department": "Marketing",
-        "status": "inactive",
-        "license": "None",
-        "created_at": "2024-03-20",
-        "password_reset_at": None,
-    },
-    {
-        "email": "sarah.lee@company.com",
-        "name": "Sarah Lee",
-        "role": "employee",
-        "department": "HR",
-        "status": "active",
-        "license": "Microsoft 365 E1",
-        "created_at": "2024-02-05",
-        "password_reset_at": None,
-    },
-]
+# ── DB connection ─────────────────────────────────────────────────────────────
+@contextmanager
+def _db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def load_users():
-    if not os.path.exists(DATA_FILE):
-        save_users(DEFAULT_USERS)
-        return DEFAULT_USERS
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+def init_db():
+    """Create tables and seed default users if DB is new."""
+    with _db() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                email             TEXT PRIMARY KEY,
+                name              TEXT NOT NULL,
+                role              TEXT DEFAULT 'employee',
+                department        TEXT DEFAULT '',
+                status            TEXT DEFAULT 'active',
+                license           TEXT DEFAULT 'None',
+                created_at        TEXT,
+                password_reset_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp   TEXT NOT NULL,
+                action      TEXT NOT NULL,
+                target      TEXT,
+                details     TEXT,
+                actor       TEXT DEFAULT 'system'
+            );
+        """)
+
+        # Seed only when the table is empty
+        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+            seed = [
+                ("john.doe@company.com",  "John Doe",    "employee",   "Engineering", "active",   "Microsoft 365 E3", "2024-01-10"),
+                ("jane.smith@company.com","Jane Smith",   "admin",      "IT",          "active",   "Microsoft 365 E5", "2023-06-15"),
+                ("bob.johnson@company.com","Bob Johnson", "contractor", "Marketing",   "inactive", "None",             "2024-03-20"),
+                ("sarah.lee@company.com", "Sarah Lee",   "employee",   "HR",          "active",   "Microsoft 365 E1", "2024-02-05"),
+                ("mike.ross@company.com", "Mike Ross",   "contractor", "Legal",       "active",   "None",             "2024-01-20"),
+            ]
+            conn.executemany(
+                "INSERT INTO users (email,name,role,department,status,license,created_at)"
+                " VALUES (?,?,?,?,?,?,?)",
+                seed,
+            )
 
 
-def save_users(users):
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-    with open(DATA_FILE, "w") as f:
-        json.dump(users, f, indent=2)
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def _row_to_dict(row) -> dict:
+    return dict(row) if row else None
 
 
-def find_user(email: str):
-    for u in load_users():
-        if u["email"].lower() == email.lower():
-            return u
-    return None
+# ── User CRUD ─────────────────────────────────────────────────────────────────
+def load_users() -> list[dict]:
+    with _db() as conn:
+        rows = conn.execute("SELECT * FROM users ORDER BY name").fetchall()
+        return [dict(r) for r in rows]
+
+
+def find_user(email: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE LOWER(email)=LOWER(?)", (email,)
+        ).fetchone()
+        return _row_to_dict(row)
 
 
 def user_exists(email: str) -> bool:
     return find_user(email) is not None
 
 
-def create_user(
-    email: str,
-    name: str,
-    role: str = "employee",
-    department: str = "",
-    license_type: str = "None",
-) -> dict:
-    users = load_users()
-    user = {
-        "email": email,
-        "name": name,
-        "role": role,
-        "department": department,
-        "status": "active",
-        "license": license_type,
-        "created_at": datetime.now().strftime("%Y-%m-%d"),
-        "password_reset_at": None,
-    }
-    users.append(user)
-    save_users(users)
-    return user
+def create_user(email, name, role="employee", department="", license_type="None") -> dict:
+    now = datetime.now().strftime("%Y-%m-%d")
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO users (email,name,role,department,status,license,created_at)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (email, name, role, department, "active", license_type, now),
+        )
+    _audit("create_user", email, f"Created {name} as {role} in {department}")
+    return find_user(email)
 
 
 def reset_password(email: str) -> bool:
-    users = load_users()
-    for u in users:
-        if u["email"].lower() == email.lower():
-            u["password_reset_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-            save_users(users)
-            return True
-    return False
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    with _db() as conn:
+        rows = conn.execute(
+            "UPDATE users SET password_reset_at=? WHERE LOWER(email)=LOWER(?)",
+            (now, email),
+        ).rowcount
+    if rows:
+        _audit("reset_password", email, f"Password reset at {now}")
+    return bool(rows)
 
 
 def disable_user(email: str) -> bool:
-    users = load_users()
-    for u in users:
-        if u["email"].lower() == email.lower():
-            u["status"] = "inactive"
-            save_users(users)
-            return True
-    return False
+    with _db() as conn:
+        rows = conn.execute(
+            "UPDATE users SET status='inactive' WHERE LOWER(email)=LOWER(?)", (email,)
+        ).rowcount
+    if rows:
+        _audit("disable_user", email, "Account disabled")
+    return bool(rows)
 
 
 def enable_user(email: str) -> bool:
-    users = load_users()
-    for u in users:
-        if u["email"].lower() == email.lower():
-            u["status"] = "active"
-            save_users(users)
-            return True
-    return False
+    with _db() as conn:
+        rows = conn.execute(
+            "UPDATE users SET status='active' WHERE LOWER(email)=LOWER(?)", (email,)
+        ).rowcount
+    if rows:
+        _audit("enable_user", email, "Account enabled")
+    return bool(rows)
 
 
 def delete_user(email: str) -> bool:
-    users = load_users()
-    filtered = [u for u in users if u["email"].lower() != email.lower()]
-    if len(filtered) < len(users):
-        save_users(filtered)
-        return True
-    return False
+    with _db() as conn:
+        rows = conn.execute(
+            "DELETE FROM users WHERE LOWER(email)=LOWER(?)", (email,)
+        ).rowcount
+    if rows:
+        _audit("delete_user", email, "Account deleted permanently")
+    return bool(rows)
 
 
 def assign_license(email: str, license_type: str) -> bool:
-    users = load_users()
-    for u in users:
-        if u["email"].lower() == email.lower():
-            u["license"] = license_type
-            save_users(users)
-            return True
-    return False
+    with _db() as conn:
+        rows = conn.execute(
+            "UPDATE users SET license=? WHERE LOWER(email)=LOWER(?)",
+            (license_type, email),
+        ).rowcount
+    if rows:
+        _audit("assign_license", email, f"License set to {license_type}")
+    return bool(rows)
 
 
 def assign_role(email: str, role: str) -> bool:
-    users = load_users()
-    for u in users:
-        if u["email"].lower() == email.lower():
-            u["role"] = role
-            save_users(users)
-            return True
-    return False
+    with _db() as conn:
+        rows = conn.execute(
+            "UPDATE users SET role=? WHERE LOWER(email)=LOWER(?)", (role, email)
+        ).rowcount
+    if rows:
+        _audit("assign_role", email, f"Role set to {role}")
+    return bool(rows)
+
+
+# ── Bulk operations ───────────────────────────────────────────────────────────
+def bulk_disable(emails: list[str]) -> int:
+    count = 0
+    for email in emails:
+        if disable_user(email):
+            count += 1
+    return count
+
+
+def bulk_delete(emails: list[str]) -> int:
+    count = 0
+    for email in emails:
+        if delete_user(email):
+            count += 1
+    return count
+
+
+# ── Audit log ─────────────────────────────────────────────────────────────────
+def _audit(action: str, target: str = None, details: str = None, actor: str = "AI Agent"):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO audit_log (timestamp,action,target,details,actor) VALUES (?,?,?,?,?)",
+            (now, action, target, details, actor),
+        )
+
+
+def load_audit_log(limit: int = 100) -> list[dict]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]

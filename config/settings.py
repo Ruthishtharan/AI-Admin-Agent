@@ -12,6 +12,9 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 # Groq (free, fast — used if LLM_BACKEND=groq)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
+# Admin panel password (set in .env / Replit Secrets)
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
 # LLM backend: "ollama" (default, free) | "anthropic" | "groq"
 LLM_BACKEND = os.getenv("LLM_BACKEND", "ollama")
 

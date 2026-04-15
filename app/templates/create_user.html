@@ -27,7 +27,12 @@
     </div>
     <div class="form-group">
       <label for="department">Department</label>
-      <input type="text" id="department" name="department" placeholder="e.g. Engineering, Marketing, HR">
+      <select id="department" name="department" required>
+        <option value="">— Select department —</option>
+        {% for dept in departments %}
+        <option value="{{ dept }}">{{ dept }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div class="form-group">
       <label for="license">License</label>

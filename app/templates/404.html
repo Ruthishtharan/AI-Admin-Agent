@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ code|default(404) }} — IT Admin Panel</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+         background:#f0f2f5;display:flex;align-items:center;justify-content:center;
+         min-height:100vh;text-align:center}
+    .box{max-width:420px;padding:40px}
+    .code{font-size:96px;font-weight:900;color:#e2e8f0;line-height:1}
+    h1{font-size:22px;font-weight:700;color:#2d3748;margin:16px 0 8px}
+    p{color:#718096;font-size:14px;margin-bottom:28px}
+    a{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;background:#4361ee;
+      color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600}
+    a:hover{background:#3451d1}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="code">{{ code|default(404) }}</div>
+    <h1>{{ message|default("Page not found") }}</h1>
+    <p>The page you're looking for doesn't exist or you may not have access.</p>
+    <a href="/">&#8592; Back to Dashboard</a>
+  </div>
+</body>
+</html>

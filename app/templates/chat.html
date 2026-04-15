@@ -6,36 +6,96 @@
   <p>Describe an IT task in plain English &mdash; the AI agent will handle it in the browser</p>
 </div>
 
-<div class="chat-container">
-  <div class="card" style="margin-bottom:16px">
-    <p style="font-size:13px;font-weight:600;color:#555;margin-bottom:10px">Example tasks:</p>
-    <div class="chip-row">
-      <span class="chip" onclick="setTask('Create a new user named Alice Chen with email alice.chen@company.com in the Engineering department')">Create new user</span>
-      <span class="chip" onclick="setTask('Reset the password for john.doe@company.com')">Reset password</span>
-      <span class="chip" onclick="setTask('Disable the account for bob.johnson@company.com')">Disable account</span>
-      <span class="chip" onclick="setTask('Enable the account for bob.johnson@company.com')">Enable account</span>
-      <span class="chip" onclick="setTask('Check if alice.chen@company.com exists, if not create them with role employee, then assign Microsoft 365 E3 license')">Conditional create &amp; assign license</span>
-      <span class="chip" onclick="setTask('Assign the Microsoft 365 E5 license to sarah.lee@company.com')">Assign license</span>
+<div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start">
+  <div class="chat-container" style="max-width:100%">
+    <div class="card" style="margin-bottom:16px">
+      <p style="font-size:13px;font-weight:600;color:#555;margin-bottom:10px">Example tasks:</p>
+      <div class="chip-row">
+        <span class="chip" onclick="setTask('Create a new user named Alice Chen with email alice.chen@company.com in the Engineering department')">Create new user</span>
+        <span class="chip" onclick="setTask('Reset the password for john.doe@company.com')">Reset password</span>
+        <span class="chip" onclick="setTask('Disable the account for bob.johnson@company.com')">Disable account</span>
+        <span class="chip" onclick="setTask('Enable the account for bob.johnson@company.com')">Enable account</span>
+        <span class="chip" onclick="setTask('Check if alice.chen@company.com exists, if not create them with role employee, then assign Microsoft 365 E3 license')">Conditional create &amp; assign license</span>
+        <span class="chip" onclick="setTask('Assign the Microsoft 365 E5 license to sarah.lee@company.com')">Assign license</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chat-box" id="chatBox">
+        <div class="chat-msg system">
+          <span class="role">System: </span>
+          <span>Ready. Enter an IT request below and the AI agent will execute it in real time.</span>
+        </div>
+      </div>
+      <div class="chat-input-row" style="margin-top:12px">
+        <input type="text" id="taskInput"
+          placeholder="e.g. Reset password for john.doe@company.com"
+          onkeypress="if(event.key==='Enter') sendTask()">
+        <button class="btn btn-primary" onclick="sendTask()" id="sendBtn">Run Task</button>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="chat-box" id="chatBox">
-      <div class="chat-msg system">
-        <span class="role">System: </span>
-        <span>Ready. Enter an IT request below and the AI agent will execute it using the browser.</span>
+  <!-- Task history sidebar -->
+  <div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;font-weight:600;color:#555">Recent Tasks</span>
+        <button onclick="clearHistory()" style="font-size:11px;background:none;border:none;color:#999;cursor:pointer">Clear</button>
       </div>
-    </div>
-    <div class="chat-input-row">
-      <input type="text" id="taskInput"
-        placeholder="e.g. Reset password for john.doe@company.com"
-        onkeypress="if(event.key==='Enter') sendTask()">
-      <button class="btn btn-primary" onclick="sendTask()" id="sendBtn">Run Task</button>
+      <div id="historyList">
+        <p style="font-size:12px;color:#bbb;text-align:center;padding:16px 0">No tasks yet</p>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
+const HISTORY_KEY = 'it_agent_history';
+
+// ── History ──────────────────────────────────────────────────────────────────
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveHistory(items) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 20)));
+}
+
+function renderHistory() {
+  const items = loadHistory();
+  const el = document.getElementById('historyList');
+  if (!items.length) {
+    el.innerHTML = '<p style="font-size:12px;color:#bbb;text-align:center;padding:16px 0">No tasks yet</p>';
+    return;
+  }
+  el.innerHTML = items.map(h => `
+    <div class="history-item" onclick="setTask(${JSON.stringify(h.task)})">
+      <span class="history-ts">${h.time}</span>
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escHtml(h.task)}</div>
+    </div>`).join('');
+}
+
+function addHistory(task) {
+  const items = loadHistory();
+  items.unshift({ task, time: new Date().toLocaleTimeString() });
+  saveHistory(items);
+  renderHistory();
+}
+
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+}
+
+renderHistory();
+
+// ── Chat helpers ──────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function setTask(text) {
   document.getElementById('taskInput').value = text;
   document.getElementById('taskInput').focus();
@@ -45,12 +105,12 @@ function appendMsg(role, text, cssClass) {
   const box = document.getElementById('chatBox');
   const div = document.createElement('div');
   div.className = 'chat-msg ' + cssClass;
-  const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  div.innerHTML = '<span class="role">' + role + ': </span><span>' + safeText + '</span>';
+  div.innerHTML = '<span class="role">' + escHtml(role) + ': </span><span>' + escHtml(text) + '</span>';
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
 
+// ── SSE streaming send ────────────────────────────────────────────────────────
 async function sendTask() {
   const input = document.getElementById('taskInput');
   const btn   = document.getElementById('sendBtn');
@@ -58,37 +118,57 @@ async function sendTask() {
   if (!task) return;
 
   input.disabled = true;
-  btn.disabled = true;
-  btn.textContent = 'Running...';
+  btn.disabled   = true;
+  btn.textContent = 'Running…';
 
   appendMsg('You', task, 'user');
-  appendMsg('Agent', 'Starting task — browser is opening...', 'system');
+  appendMsg('Agent', 'Starting task — browser is opening…', 'system');
+  addHistory(task);
+  input.value = '';
 
   try {
-    const res  = await fetch('/api/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({task})
+      body: JSON.stringify({task}),
     });
-    const data = await res.json();
 
-    if (data.steps) {
-      data.steps.forEach(s => {
-        if (s.step !== 'START') appendMsg(s.step, s.message, 'system');
-      });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({error: 'Request failed'}));
+      appendMsg('Error', '❌ ' + (err.error || 'Unknown error'), 'error');
+      return;
     }
 
-    if (data.success) {
-      appendMsg('Done', '✅ ' + data.result, 'agent');
-    } else {
-      appendMsg('Error', '❌ ' + (data.error || 'Task failed'), 'error');
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let   buffer  = '';
+
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();   // keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'step' && ev.step !== 'START') {
+            appendMsg(ev.step, ev.message, ev.step === 'ERROR' ? 'error' : 'system');
+          } else if (ev.type === 'done') {
+            appendMsg('Done', '✅ ' + ev.result, 'agent');
+          } else if (ev.type === 'error') {
+            appendMsg('Error', '❌ ' + ev.error, 'error');
+          }
+        } catch {}
+      }
     }
-    input.value = '';
   } catch (err) {
     appendMsg('Error', '❌ ' + err.message, 'error');
   } finally {
     input.disabled = false;
-    btn.disabled = false;
+    btn.disabled   = false;
     btn.textContent = 'Run Task';
     input.focus();
   }

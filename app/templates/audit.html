@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Audit Log - IT Admin Panel{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div class="page-header" style="margin-bottom:0">
+    <h2>Audit Log</h2>
+    <p>Last {{ logs | length }} actions recorded</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Action</th>
+          <th>Target</th>
+          <th>Details</th>
+          <th>Actor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td style="font-size:12px;color:#888;white-space:nowrap">{{ log.timestamp }}</td>
+          <td>
+            {% set action = log.action %}
+            {% if action in ['disable_user','delete_user'] %}
+              <span class="badge badge-danger">{{ action.replace('_',' ') }}</span>
+            {% elif action in ['create_user','enable_user'] %}
+              <span class="badge badge-success">{{ action.replace('_',' ') }}</span>
+            {% elif action == 'reset_password' %}
+              <span class="badge badge-warning">{{ action.replace('_',' ') }}</span>
+            {% elif action == 'login' %}
+              <span class="badge badge-gray">{{ action }}</span>
+            {% else %}
+              <span class="badge badge-info">{{ action.replace('_',' ') }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;color:#555">{{ log.target or '—' }}</td>
+          <td style="font-size:13px;color:#666">{{ log.details or '—' }}</td>
+          <td style="font-size:12px;color:#888">{{ log.actor }}</td>
+        </tr>
+        {% endfor %}
+        {% if not logs %}
+        <tr>
+          <td colspan="5" style="text-align:center;color:#999;padding:48px;font-size:14px">
+            No audit entries yet. Actions will appear here as they happen.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
