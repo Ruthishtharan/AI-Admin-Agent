@@ -4,7 +4,7 @@ import threading
 import time
 
 from app import create_app
-from config.settings import ANTHROPIC_API_KEY, GOOGLE_API_KEY, LLM_BACKEND, OLLAMA_MODEL, FLASK_PORT
+from config.settings import ANTHROPIC_API_KEY, GROQ_API_KEY, LLM_BACKEND, OLLAMA_MODEL, FLASK_PORT
 
 # Detect if running on Replit
 IS_REPLIT = bool(os.getenv("REPL_ID") or os.getenv("REPL_SLUG"))
@@ -35,15 +35,15 @@ def main():
                 print("  → Add it to your .env file: ANTHROPIC_API_KEY=sk-ant-...")
             sys.exit(1)
         print("[OK] Anthropic API key loaded  (model: claude-sonnet-4-6)")
-    elif LLM_BACKEND == "google":
-        if not GOOGLE_API_KEY:
-            print("\n[ERROR] LLM_BACKEND=google but GOOGLE_API_KEY is not set.")
+    elif LLM_BACKEND == "groq":
+        if not GROQ_API_KEY:
+            print("\n[ERROR] LLM_BACKEND=groq but GROQ_API_KEY is not set.")
             if IS_REPLIT:
-                print("  → Add it in Replit Secrets: GOOGLE_API_KEY = AIzaSy...")
+                print("  → Add it in Replit Secrets: GROQ_API_KEY = gsk_...")
             else:
-                print("  → Add it to your .env file: GOOGLE_API_KEY=AIzaSy...")
+                print("  → Add it to your .env file: GROQ_API_KEY=gsk_...")
             sys.exit(1)
-        print("[OK] Google API key loaded  (model: gemini-1.5-flash)")
+        print("[OK] Groq API key loaded  (model: llama-3.3-70b-versatile)")
     elif not IS_REPLIT:
         # Ollama mode — only check locally (Ollama can't run on Replit)
         if not check_ollama():
@@ -72,8 +72,8 @@ def main():
 
     if LLM_BACKEND == "anthropic":
         backend_label = "Anthropic claude-sonnet-4-6"
-    elif LLM_BACKEND == "google":
-        backend_label = "Google Gemini (gemini-1.5-flash)"
+    elif LLM_BACKEND == "groq":
+        backend_label = "Groq (llama-3.3-70b-versatile)"
     else:
         backend_label = f"Ollama / {OLLAMA_MODEL}"
 

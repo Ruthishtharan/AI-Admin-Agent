@@ -3,7 +3,7 @@ from typing import Callable, Optional
 from openai import OpenAI
 
 from config.settings import (
-    ANTHROPIC_API_KEY, GOOGLE_API_KEY,
+    ANTHROPIC_API_KEY, GROQ_API_KEY,
     LLM_BACKEND, OLLAMA_URL, OLLAMA_MODEL,
 )
 from agent.prompts import SYSTEM_PROMPT
@@ -15,21 +15,21 @@ from browser.browser_controller import BrowserController
 # ---------------------------------------------------------------------------
 
 _USE_ANTHROPIC = False
-_USE_GOOGLE    = False
-_GOOGLE_MODEL  = "gemini-1.5-flash"
+_USE_GROQ      = False
+_GROQ_MODEL    = "llama-3.3-70b-versatile"
 
 if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     import anthropic as _anthropic
     _anthropic_client = _anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     _USE_ANTHROPIC = True
 
-elif LLM_BACKEND == "google" and GOOGLE_API_KEY:
+elif LLM_BACKEND == "groq" and GROQ_API_KEY:
     # Google's OpenAI-compatible endpoint — works with standard openai SDK
     _google_client = OpenAI(
-        api_key=GOOGLE_API_KEY,
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        api_key=GROQ_API_KEY,
+        base_url="https://api.groq.com/openai/v1",
     )
-    _USE_GOOGLE = True
+    _USE_GROQ = True
 
 else:
     _ollama_client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
@@ -320,8 +320,8 @@ def run_agent(
 
     if _USE_ANTHROPIC:
         backend = "Anthropic (claude-sonnet-4-6)"
-    elif _USE_GOOGLE:
-        backend = f"Google Gemini ({_GOOGLE_MODEL})"
+    elif _USE_GROQ:
+        backend = f"Groq ({_GROQ_MODEL})"
     else:
         backend = f"Ollama ({OLLAMA_MODEL})"
     log("START", f"Task: {task}  |  Backend: {backend}")
@@ -332,8 +332,8 @@ def run_agent(
             browser.go_to(start_url)
         if _USE_ANTHROPIC:
             return _run_anthropic(task, log, browser, system_prompt)
-        elif _USE_GOOGLE:
-            return _run_openai_compatible(_google_client, _GOOGLE_MODEL, task, log, browser, system_prompt)
+        elif _USE_GROQ:
+            return _run_openai_compatible(_groq_client, _GROQ_MODEL, task, log, browser, system_prompt)
         else:
             return _run_openai_compatible(_ollama_client, OLLAMA_MODEL, task, log, browser, system_prompt)
     except Exception as e:
