@@ -16,7 +16,7 @@ from browser.browser_controller import BrowserController
 
 _USE_ANTHROPIC = False
 _USE_GROQ      = False
-_GROQ_MODEL    = "llama-3.3-70b-versatile"
+_GROQ_MODEL    = "llama3-groq-70b-8192-tool-use-preview"
 
 if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     import anthropic as _anthropic
