@@ -74,21 +74,6 @@
   .step-ERROR    { color:var(--danger); }
   .step-DONE     { color:#34d399; font-weight:600; }
 
-  /* Screenshot preview in chat */
-  .screenshot-msg {
-    margin: 6px 0; border-radius: 8px; overflow: hidden;
-    border: 1px solid var(--border); max-width: 100%;
-  }
-  .screenshot-msg img {
-    width: 100%; display: block; border-radius: 7px;
-    cursor: pointer; transition: opacity .15s;
-  }
-  .screenshot-msg img:hover { opacity: .9; }
-  .screenshot-label {
-    font-size: 10px; color: var(--muted); padding: 3px 8px;
-    background: var(--th-bg); border-top: 1px solid var(--border);
-  }
-
   /* Watch-browser modal */
   .watch-modal-card {
     background: var(--card); border-radius: 16px; padding: 28px;
@@ -403,21 +388,6 @@ function appendMsg(role,text,extra=''){
   box.appendChild(div); box.scrollTop=box.scrollHeight;
 }
 
-function appendScreenshot(b64){
-  const box=document.getElementById('chatBox');
-  const wrap=document.createElement('div');
-  wrap.className='screenshot-msg';
-  const img=document.createElement('img');
-  img.src='data:image/png;base64,'+b64;
-  img.alt='Browser screenshot';
-  img.onclick=()=>{ window.open(img.src,'_blank'); };
-  const lbl=document.createElement('div');
-  lbl.className='screenshot-label';
-  lbl.textContent='Browser view';
-  wrap.appendChild(img); wrap.appendChild(lbl);
-  box.appendChild(wrap); box.scrollTop=box.scrollHeight;
-}
-
 function showTyping(){
   const box=document.getElementById('chatBox');
   const el=document.createElement('div');
@@ -483,13 +453,8 @@ async function sendTask(){
             const step=ev.step;
             if(step==='START') continue;
 
-            // Screenshots render as images, not text
-            if(step==='SCREENSHOT'){
-              hideTyping();
-              appendScreenshot(ev.message);
-              showTyping();
-              continue;
-            }
+            // Ignore screenshot events (browser window is visible on screen)
+            if(step==='SCREENSHOT') continue;
 
             hideTyping();
             const icon=STEP_ICONS[step]||'•';

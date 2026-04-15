@@ -54,22 +54,36 @@ class BrowserController:
         Tries multiple strategies so the LLM only needs to pass the visible text.
         """
         strategies = [
-            # Exact button
             lambda: self._page.get_by_role("button", name=text, exact=True).first.click(),
-            # Partial button
             lambda: self._page.get_by_role("button", name=text, exact=False).first.click(),
-            # Exact link
-            lambda: self._page.get_by_role("link", name=text, exact=True).first.click(),
-            # Partial link
-            lambda: self._page.get_by_role("link", name=text, exact=False).first.click(),
-            # Any element containing text (broad fallback)
+            lambda: self._page.get_by_role("link",   name=text, exact=True).first.click(),
+            lambda: self._page.get_by_role("link",   name=text, exact=False).first.click(),
             lambda: self._page.get_by_text(text, exact=True).first.click(),
             lambda: self._page.get_by_text(text, exact=False).first.click(),
-            # CSS text match
             lambda: self._page.locator(f"button:has-text('{text}')").first.click(),
             lambda: self._page.locator(f"a:has-text('{text}')").first.click(),
         ]
         return self._try(strategies, f"element '{text}'")
+
+    def click_in_row(self, row_text: str, button_text: str) -> str:
+        """
+        Click a button/link INSIDE the table row that contains row_text.
+        Use this whenever multiple rows have the same button (Disable, Enable, Delete).
+        e.g. click_in_row("akshaya.jothi@company.com", "Disable")
+        """
+        strategies = [
+            # Table row scoped (most common case)
+            lambda: self._page.locator("tr", has_text=row_text)\
+                              .get_by_role("button", name=button_text).first.click(),
+            lambda: self._page.locator("tr", has_text=row_text)\
+                              .locator(f"button:has-text('{button_text}')").first.click(),
+            # Any container (div/li) scoped
+            lambda: self._page.locator(f"*:has-text('{row_text}')")\
+                              .get_by_role("button", name=button_text).first.click(),
+            lambda: self._page.locator(f"*:has-text('{row_text}')")\
+                              .locator(f"button:has-text('{button_text}')").first.click(),
+        ]
+        return self._try(strategies, f"'{button_text}' in row '{row_text}'")
 
     def click_button(self, text: str) -> str:
         return self.click(text)

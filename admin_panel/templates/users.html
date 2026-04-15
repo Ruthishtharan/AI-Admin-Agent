@@ -3,63 +3,80 @@
 {% block content %}
 
 <div class="page-header">
-  <h1>All Users ({{ users|length }})</h1>
-  <a href="/users/create" class="btn btn-primary">+ Create New User</a>
+  <div>
+    <h1>All Users</h1>
+    <p>{{ users|length }} user{{ 's' if users|length != 1 }} in the system</p>
+  </div>
+  <a href="/users/create" class="btn btn-primary">⊕ Create New User</a>
 </div>
 
 <div class="card">
-  {% if users %}
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Department</th>
-        <th>Role</th>
-        <th>License</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for user in users %}
-      <tr>
-        <td><strong>{{ user['name'] }}</strong></td>
-        <td>{{ user['email'] }}</td>
-        <td>{{ user['department'] or '—' }}</td>
-        <td><span class="badge badge-{{ user['role'] }}">{{ user['role'] }}</span></td>
-        <td style="font-size:12px;color:#64748b">{{ user['license'] }}</td>
-        <td><span class="badge badge-{{ user['status'] }}">{{ user['status'] }}</span></td>
-        <td>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            {% if user['status'] == 'active' %}
-            <form method="POST" action="/users/{{ user['email'] }}/disable" style="display:inline">
-              <button type="submit" class="btn btn-warning btn-sm">Disable</button>
-            </form>
-            {% else %}
-            <form method="POST" action="/users/{{ user['email'] }}/enable" style="display:inline">
-              <button type="submit" class="btn btn-success btn-sm">Enable</button>
-            </form>
-            {% endif %}
-            <form method="POST" action="/users/{{ user['email'] }}/reset-password" style="display:inline">
-              <button type="submit" class="btn btn-ghost btn-sm">Reset Password</button>
-            </form>
-            <form method="POST" action="/users/{{ user['email'] }}/delete"
-                  style="display:inline"
-                  onsubmit="return confirm('Delete {{ user['name'] }}? This cannot be undone.')">
-              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-            </form>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p style="color:#94a3b8;text-align:center;padding:40px 0;font-size:15px">
-    No users yet. <a href="/users/create" style="color:#4f46e5">Create the first one →</a>
-  </p>
-  {% endif %}
+  <div class="card-body" style="padding:0">
+    {% if users %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Department</th>
+          <th>Role</th>
+          <th>License</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="
+                width:32px;height:32px;border-radius:8px;flex-shrink:0;
+                background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                display:flex;align-items:center;justify-content:center;
+                font-size:13px;font-weight:700;color:#fff;
+              ">{{ user['name'][0].upper() }}</div>
+              <strong style="color:var(--text)">{{ user['name'] }}</strong>
+            </div>
+          </td>
+          <td style="color:var(--muted);font-size:13px">{{ user['email'] }}</td>
+          <td style="color:var(--text-2)">{{ user['department'] or '—' }}</td>
+          <td><span class="badge badge-{{ user['role'] }}">{{ user['role'] }}</span></td>
+          <td style="color:var(--muted);font-size:12px">{{ user['license'] }}</td>
+          <td><span class="badge badge-{{ user['status'] }}">{{ user['status'] }}</span></td>
+          <td>
+            <div class="actions">
+              {% if user['status'] == 'active' %}
+              <form method="POST" action="/users/{{ user['email'] }}/disable" style="display:inline">
+                <button type="submit" class="btn btn-warning btn-sm">Disable</button>
+              </form>
+              {% else %}
+              <form method="POST" action="/users/{{ user['email'] }}/enable" style="display:inline">
+                <button type="submit" class="btn btn-success btn-sm">Enable</button>
+              </form>
+              {% endif %}
+              <form method="POST" action="/users/{{ user['email'] }}/reset-password" style="display:inline">
+                <button type="submit" class="btn btn-ghost btn-sm">Reset Password</button>
+              </form>
+              <form method="POST" action="/users/{{ user['email'] }}/delete"
+                    style="display:inline"
+                    onsubmit="return confirm('Delete {{ user['name'] }}? This cannot be undone.')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:12px">👥</div>
+      <div style="font-size:15px;margin-bottom:8px">No users yet</div>
+      <a href="/users/create" class="btn btn-primary">Create first user</a>
+    </div>
+    {% endif %}
+  </div>
 </div>
 
 {% endblock %}

@@ -116,6 +116,26 @@ TOOLS_OPENAI = [
     {
         "type": "function",
         "function": {
+            "name": "click_in_row",
+            "description": (
+                "Click a button inside a specific table row identified by text in that row. "
+                "ALWAYS use this instead of click() when multiple rows have the same button text "
+                "(Disable, Enable, Delete, Reset Password). "
+                "row_text should be the user's name or email to uniquely identify the row."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "row_text":    {"type": "string", "description": "Text visible in the target row (name or email)"},
+                    "button_text": {"type": "string", "description": "Text on the button to click"},
+                },
+                "required": ["row_text", "button_text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "task_complete",
             "description": "Call this when the task is fully done. Provide a clear human-readable summary.",
             "parameters": {
@@ -185,6 +205,9 @@ def _execute_tool(browser, name: str, inputs: dict) -> str:
         elif name == "select_option":
             return browser.select_option(inputs["label"], inputs["value"])
 
+        elif name == "click_in_row":
+            return browser.click_in_row(inputs["row_text"], inputs["button_text"])
+
         elif name == "task_complete":
             return f"TASK_COMPLETE: {inputs.get('summary', 'Done.')}"
 
@@ -248,6 +271,8 @@ def _run_openai_compatible(
                 log("READ", "Reading page content…")
             elif fn_name == "click":
                 log("CLICK", f"Clicking \"{fn_args.get('text','')}\"")
+            elif fn_name == "click_in_row":
+                log("CLICK", f"Clicking \"{fn_args.get('button_text','')}\" on row \"{fn_args.get('row_text','')}\"")
             elif fn_name == "fill_input":
                 log("TYPE", f"Filling \"{fn_args.get('label','')}\" → \"{fn_args.get('value','')}\"")
             elif fn_name == "select_option":
@@ -258,15 +283,6 @@ def _run_openai_compatible(
                 log("TOOL", fn_name)
 
             result = _execute_tool(browser, fn_name, fn_args)
-
-            # After every browser action, capture and stream a screenshot
-            if fn_name not in ("task_complete", "read_page"):
-                try:
-                    shot = browser.screenshot_base64()
-                    if shot:
-                        log("SCREENSHOT", shot)
-                except Exception:
-                    pass
 
             if fn_name == "task_complete":
                 return fn_args.get("summary", "Done.")
@@ -314,8 +330,12 @@ def _run_anthropic(task: str, log: Callable, browser, max_steps: int = 20) -> st
 
             if fn_name == "navigate":
                 log("NAVIGATE", f"Going to {fn_args.get('url','')}")
+            elif fn_name == "read_page":
+                log("READ", "Reading page content…")
             elif fn_name == "click":
                 log("CLICK", f"Clicking \"{fn_args.get('text','')}\"")
+            elif fn_name == "click_in_row":
+                log("CLICK", f"Clicking \"{fn_args.get('button_text','')}\" on row \"{fn_args.get('row_text','')}\"")
             elif fn_name == "fill_input":
                 log("TYPE", f"Filling \"{fn_args.get('label','')}\" → \"{fn_args.get('value','')}\"")
             elif fn_name == "select_option":
@@ -326,14 +346,6 @@ def _run_anthropic(task: str, log: Callable, browser, max_steps: int = 20) -> st
                 log("TOOL", fn_name)
 
             result = _execute_tool(browser, fn_name, fn_args)
-
-            if fn_name not in ("task_complete", "read_page"):
-                try:
-                    shot = browser.screenshot_base64()
-                    if shot:
-                        log("SCREENSHOT", shot)
-                except Exception:
-                    pass
 
             if fn_name == "task_complete":
                 return fn_args.get("summary", "Done.")
@@ -384,9 +396,6 @@ def run_agent(
         # Start at the admin panel login page
         log("NAVIGATE", f"Opening admin panel at {ADMIN_PANEL_URL}")
         browser.go_to(f"{ADMIN_PANEL_URL}/login")
-        shot = browser.screenshot_base64()
-        if shot:
-            log("SCREENSHOT", shot)
 
         if _USE_ANTHROPIC:
             return _run_anthropic(task, log, browser)

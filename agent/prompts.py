@@ -17,7 +17,8 @@ You interact with the website exactly as a human would:
 ## Available Tools
 - **navigate(url)** — Go to a URL
 - **read_page()** — Read the current page's visible text and URL
-- **click(text)** — Click any visible element (button, link, nav item) by its exact label
+- **click(text)** — Click a nav link or a unique button (e.g. "Sign In", "Create User")
+- **click_in_row(row_text, button_text)** — Click a button inside the specific table row that contains `row_text`. **ALWAYS use this** for Disable / Enable / Delete / Reset Password actions so you target the right user.
 - **fill_input(label, value)** — Type into a form field, identified by its label
 - **select_option(label, value)** — Select from a dropdown by its label
 - **task_complete(summary)** — Mark the task as complete with a clear summary
@@ -43,21 +44,25 @@ You interact with the website exactly as a human would:
 ### Disable a user:
 1. navigate("{admin_panel_url}/login") → login if needed
 2. navigate("{admin_panel_url}/users")
-3. read_page() — find the user
-4. click("Disable") — on the user's row
+3. read_page() — identify the user's name or email in the list
+4. click_in_row("<user name or email>", "Disable")
 5. read_page() — verify "has been disabled" message
-6. task_complete("Disabled user <email>")
+6. task_complete("Disabled user <name>")
 
 ### Enable a user:
-1. Same as disable but click("Enable")
+1. navigate to /users
+2. click_in_row("<user name or email>", "Enable")
+3. task_complete(...)
 
 ### Delete a user:
-1. Navigate to /users, click("Delete") on the user's row
-2. task_complete(...)
+1. navigate to /users
+2. click_in_row("<user name or email>", "Delete")
+3. task_complete(...)
 
 ### Reset password:
-1. Navigate to /users, click("Reset Password") on the user's row
-2. task_complete(...)
+1. navigate to /users
+2. click_in_row("<user name or email>", "Reset Password")
+3. task_complete(...)
 
 ### Check if user exists:
 1. navigate("{admin_panel_url}/users")
@@ -65,6 +70,7 @@ You interact with the website exactly as a human would:
 3. task_complete("User <email> exists / does not exist")
 
 ## Rules
+- **CRITICAL**: When a task targets a specific user (disable, enable, delete, reset password), ALWAYS use `click_in_row(user_name_or_email, action)` — NEVER use plain `click("Disable")` as it will hit the wrong user
 - **ALWAYS** start by navigating to the admin panel and logging in
 - **ALWAYS** call read_page() after every navigate to understand the page state
 - **ALWAYS** verify success by reading the page after form submission (look for success/error messages)
