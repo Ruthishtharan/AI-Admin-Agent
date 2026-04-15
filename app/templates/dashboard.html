@@ -1,41 +1,61 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - IT Admin Panel{% endblock %}
 {% block content %}
+
 <div class="page-header">
   <h2>Dashboard</h2>
-  <p>IT Admin Panel &mdash; User Management Overview</p>
+  <p>User Management Overview</p>
 </div>
 
 <div class="stats-grid">
   <div class="stat-card">
-    <div class="stat-label">Total Users</div>
-    <div class="stat-value">{{ stats.total }}</div>
+    <div class="stat-icon blue">👥</div>
+    <div class="stat-body">
+      <div class="stat-label">Total Users</div>
+      <div class="stat-value">{{ stats.total }}</div>
+    </div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">Active</div>
-    <div class="stat-value green">{{ stats.active }}</div>
+    <div class="stat-icon green">✅</div>
+    <div class="stat-body">
+      <div class="stat-label">Active</div>
+      <div class="stat-value green">{{ stats.active }}</div>
+    </div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">Inactive</div>
-    <div class="stat-value red">{{ stats.inactive }}</div>
+    <div class="stat-icon red">🚫</div>
+    <div class="stat-body">
+      <div class="stat-label">Inactive</div>
+      <div class="stat-value red">{{ stats.inactive }}</div>
+    </div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">Admins</div>
-    <div class="stat-value orange">{{ stats.admins }}</div>
+    <div class="stat-icon orange">🔑</div>
+    <div class="stat-body">
+      <div class="stat-label">Admins</div>
+      <div class="stat-value orange">{{ stats.admins }}</div>
+    </div>
   </div>
 </div>
 
+<!-- Quick actions -->
+<div style="display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap">
+  <a href="/create-user" class="btn btn-primary">⊕ Create User</a>
+  <a href="/chat"        class="btn btn-outline">✦ AI Agent</a>
+  <a href="/audit"       class="btn btn-outline">≡ Audit Log</a>
+  <a href="/export-csv"  class="btn btn-outline">↓ Export CSV</a>
+</div>
+
 <div class="card">
-  <div class="topbar">
-    <h3 style="font-size:15px;font-weight:700;">Recent Users</h3>
-    <a href="/users" class="btn btn-outline btn-sm">View All Users</a>
+  <div class="topbar" style="margin-bottom:16px">
+    <h3 style="font-size:14px;font-weight:700;color:var(--text)">Recent Users</h3>
+    <a href="/users" class="btn btn-outline btn-sm">View All →</a>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Email</th>
+          <th>User</th>
           <th>Status</th>
           <th>Role</th>
           <th>Department</th>
@@ -44,8 +64,17 @@
       <tbody>
         {% for user in recent_users %}
         <tr>
-          <td><strong>{{ user.name }}</strong></td>
-          <td style="color:#555">{{ user.email }}</td>
+          <td>
+            <div class="user-cell">
+              <div class="avatar" style="background:{{ ['#6366f1','#8b5cf6','#ec4899','#06b6d4','#10b981','#f59e0b'] | random }}">
+                {{ user.name[:2].upper() }}
+              </div>
+              <div class="user-cell-info">
+                <span class="user-cell-name">{{ user.name }}</span>
+                <span class="user-cell-email">{{ user.email }}</span>
+              </div>
+            </div>
+          </td>
           <td>
             {% if user.status == 'active' %}
             <span class="badge badge-success">Active</span>
@@ -54,11 +83,19 @@
             {% endif %}
           </td>
           <td><span class="badge badge-info">{{ user.role | capitalize }}</span></td>
-          <td style="color:#666">{{ user.department or '—' }}</td>
+          <td style="color:var(--muted);font-size:13px">{{ user.department or '—' }}</td>
         </tr>
         {% endfor %}
+        {% if not recent_users %}
+        <tr>
+          <td colspan="4" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">
+            No users yet. <a href="/create-user" style="color:var(--accent);font-weight:600">Create the first one →</a>
+          </td>
+        </tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
 </div>
+
 {% endblock %}

@@ -4,26 +4,63 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ code|default(404) }} — IT Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-         background:#f0f2f5;display:flex;align-items:center;justify-content:center;
-         min-height:100vh;text-align:center}
-    .box{max-width:420px;padding:40px}
-    .code{font-size:96px;font-weight:900;color:#e2e8f0;line-height:1}
-    h1{font-size:22px;font-weight:700;color:#2d3748;margin:16px 0 8px}
-    p{color:#718096;font-size:14px;margin-bottom:28px}
-    a{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;background:#4361ee;
-      color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600}
-    a:hover{background:#3451d1}
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+    .wrap { position: relative; z-index: 1; max-width: 380px; }
+    .code {
+      font-size: 100px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+    h1 { font-size: 20px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    p  { color: #64748b; font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+    a {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 11px 22px;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: #fff;
+      border-radius: 9px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 2px 10px rgba(99,102,241,.4);
+      transition: all .2s;
+    }
+    a:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(99,102,241,.5); }
   </style>
 </head>
 <body>
-  <div class="box">
+  <div class="wrap">
     <div class="code">{{ code|default(404) }}</div>
     <h1>{{ message|default("Page not found") }}</h1>
-    <p>The page you're looking for doesn't exist or you may not have access.</p>
-    <a href="/">&#8592; Back to Dashboard</a>
+    <p>The page you're looking for doesn't exist or you may not have permission to access it.</p>
+    <a href="/">← Back to Dashboard</a>
   </div>
 </body>
 </html>

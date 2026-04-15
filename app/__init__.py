@@ -11,11 +11,11 @@ def create_app():
     from app.models import init_db
     init_db()
 
-    # Make load_users available in all templates for the nav badge
-    from app.models import load_users
+    # Make helpers available in all templates
+    from app.models import load_users, load_profile
     @app.context_processor
     def inject_globals():
-        return {"load_users": load_users}
+        return {"load_users": load_users, "load_profile": load_profile}
 
     register_routes(app)
 

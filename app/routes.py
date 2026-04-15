@@ -9,11 +9,14 @@ from flask import (
     render_template, request, redirect, url_for,
     flash, jsonify, session, Response, stream_with_context,
 )
+import base64
 from app.models import (
     load_users, find_user, create_user as model_create_user,
     reset_password, disable_user, enable_user, delete_user,
     assign_license, assign_role, user_exists,
     bulk_disable, bulk_delete, load_audit_log, _audit,
+    load_profile, save_profile, save_feedback, load_feedback,
+    save_webauthn_credential, load_webauthn_credentials,
 )
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
@@ -270,6 +273,68 @@ def register_routes(app):
         return Response(generate(), content_type="text/event-stream",
                         headers={"X-Accel-Buffering": "no",
                                  "Cache-Control": "no-cache"})
+
+    # ── Profile ───────────────────────────────────────────────────────────────
+    @app.route("/profile", methods=["GET", "POST"])
+    @login_required
+    def profile():
+        if request.method == "POST":
+            photo = ""
+            if "photo" in request.files:
+                f = request.files["photo"]
+                if f and f.filename:
+                    data = f.read()
+                    mime = f.content_type or "image/jpeg"
+                    photo = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+            current = load_profile()
+            save_profile({
+                "name":  request.form.get("name",  current.get("name", "Admin")),
+                "title": request.form.get("title", current.get("title", "")),
+                "email": request.form.get("email", current.get("email", "")),
+                "phone": request.form.get("phone", current.get("phone", "")),
+                "photo": photo or current.get("photo", ""),
+            })
+            flash("Profile updated.", "success")
+            return redirect(url_for("profile"))
+        return render_template("profile.html", profile=load_profile())
+
+    # ── Feedback ──────────────────────────────────────────────────────────────
+    @app.route("/api/feedback", methods=["POST"])
+    @login_required
+    def api_feedback():
+        data = request.get_json() or {}
+        rating  = int(data.get("rating", 0))
+        comment = data.get("comment", "")[:500]
+        task    = data.get("task", "")[:300]
+        if 1 <= rating <= 5:
+            save_feedback(rating, comment, task)
+        return jsonify({"ok": True})
+
+    @app.route("/feedback")
+    @login_required
+    def feedback_page():
+        return render_template("feedback.html", entries=load_feedback())
+
+    # ── WebAuthn (demo) ───────────────────────────────────────────────────────
+    @app.route("/api/webauthn/register", methods=["POST"])
+    def webauthn_register():
+        data = request.get_json() or {}
+        cred_id = data.get("credentialId", "")
+        if cred_id:
+            save_webauthn_credential(cred_id)
+            return jsonify({"ok": True})
+        return jsonify({"ok": False}), 400
+
+    @app.route("/api/webauthn/authenticate", methods=["POST"])
+    def webauthn_authenticate():
+        data = request.get_json() or {}
+        cred_id = data.get("credentialId", "")
+        creds = load_webauthn_credentials()
+        if cred_id and cred_id in creds:
+            session["authenticated"] = True
+            _audit("login", details="Biometric sign-in", actor="admin")
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Credential not recognized"}), 401
 
     # ── JSON API ──────────────────────────────────────────────────────────────
     @app.route("/api/users")

@@ -1,41 +1,55 @@
 {% extends "base.html" %}
 {% block title %}Edit Role & License - IT Admin Panel{% endblock %}
 {% block content %}
+
 <div class="page-header">
   <h2>Edit Role &amp; License</h2>
-  <p>Update access level and software license for {{ user.name }}</p>
+  <p>Update access level and software license</p>
 </div>
 
-<div class="card" style="max-width:500px">
-  <div style="padding:13px;background:#f8fafc;border-radius:8px;margin-bottom:20px;border:1px solid var(--border)">
-    <strong>{{ user.name }}</strong>
-    <span style="color:#888;font-size:13px"> &middot; {{ user.email }}</span>
+<div class="card" style="max-width:480px">
+
+  <div style="display:flex;align-items:center;gap:14px;padding:14px;background:var(--bg);border-radius:10px;margin-bottom:22px;border:1px solid var(--border)">
+    <div class="avatar" style="width:40px;height:40px;font-size:14px;background:#6366f1">
+      {{ user.name[:2].upper() }}
+    </div>
+    <div>
+      <div style="font-weight:700;color:var(--text)">{{ user.name }}</div>
+      <div style="font-size:13px;color:var(--muted)">{{ user.email }}</div>
+    </div>
   </div>
+
   <form method="POST">
-    <div class="form-group">
-      <label for="role">Role</label>
-      <select id="role" name="role">
-        <option value="employee" {% if user.role == 'employee' %}selected{% endif %}>Employee</option>
-        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-        <option value="contractor" {% if user.role == 'contractor' %}selected{% endif %}>Contractor</option>
-        <option value="guest" {% if user.role == 'guest' %}selected{% endif %}>Guest</option>
-      </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role">
+          <option value="employee"   {% if user.role == 'employee'   %}selected{% endif %}>Employee</option>
+          <option value="admin"      {% if user.role == 'admin'      %}selected{% endif %}>Admin</option>
+          <option value="contractor" {% if user.role == 'contractor' %}selected{% endif %}>Contractor</option>
+          <option value="guest"      {% if user.role == 'guest'      %}selected{% endif %}>Guest</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label for="license">License</label>
+        <select id="license" name="license">
+          <option value="None"                    {% if user.license == 'None'                    %}selected{% endif %}>None</option>
+          <option value="Microsoft 365 E1"        {% if user.license == 'Microsoft 365 E1'        %}selected{% endif %}>Microsoft 365 E1</option>
+          <option value="Microsoft 365 E3"        {% if user.license == 'Microsoft 365 E3'        %}selected{% endif %}>Microsoft 365 E3</option>
+          <option value="Microsoft 365 E5"        {% if user.license == 'Microsoft 365 E5'        %}selected{% endif %}>Microsoft 365 E5</option>
+          <option value="Google Workspace Basic"   {% if user.license == 'Google Workspace Basic'  %}selected{% endif %}>Google Workspace Basic</option>
+          <option value="Google Workspace Business"{% if user.license == 'Google Workspace Business'%}selected{% endif %}>Google Workspace Business</option>
+        </select>
+      </div>
     </div>
-    <div class="form-group">
-      <label for="license">License</label>
-      <select id="license" name="license">
-        <option value="None" {% if user.license == 'None' %}selected{% endif %}>None</option>
-        <option value="Microsoft 365 E1" {% if user.license == 'Microsoft 365 E1' %}selected{% endif %}>Microsoft 365 E1</option>
-        <option value="Microsoft 365 E3" {% if user.license == 'Microsoft 365 E3' %}selected{% endif %}>Microsoft 365 E3</option>
-        <option value="Microsoft 365 E5" {% if user.license == 'Microsoft 365 E5' %}selected{% endif %}>Microsoft 365 E5</option>
-        <option value="Google Workspace Basic" {% if user.license == 'Google Workspace Basic' %}selected{% endif %}>Google Workspace Basic</option>
-        <option value="Google Workspace Business" {% if user.license == 'Google Workspace Business' %}selected{% endif %}>Google Workspace Business</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:24px">
+
+    <div style="height:1px;background:var(--border);margin:18px 0"></div>
+
+    <div style="display:flex;gap:10px">
       <button type="submit" class="btn btn-primary">Save Changes</button>
       <a href="/users" class="btn btn-outline">Cancel</a>
     </div>
   </form>
 </div>
+
 {% endblock %}

@@ -314,11 +314,20 @@ def _auto_login(browser: BrowserController) -> None:
     try:
         browser.go_to(f"{BASE_URL}/login")
         time.sleep(0.3)
+        # If already redirected away from login, we're authenticated
+        if "/login" not in browser.get_current_url():
+            return
         browser._page.get_by_placeholder("Enter admin password").fill(ADMIN_PASSWORD)
         browser._page.get_by_role("button", name="Sign In").click()
-        time.sleep(0.5)
+        # Wait until the browser leaves /login (redirect to dashboard)
+        try:
+            browser._page.wait_for_url(
+                lambda url: "/login" not in url, timeout=6000
+            )
+        except Exception:
+            time.sleep(1.5)  # fallback
     except Exception:
-        pass  # If already logged in or login page not reached, continue
+        pass  # already logged in or non-critical error
 
 
 # ---------------------------------------------------------------------------

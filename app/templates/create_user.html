@@ -1,39 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Create User - IT Admin Panel{% endblock %}
 {% block content %}
+
 <div class="page-header">
   <h2>Create User</h2>
   <p>Add a new user account to the system</p>
 </div>
 
-<div class="card" style="max-width:560px">
+<div class="card" style="max-width:540px">
   <form method="POST">
     <div class="form-group">
       <label for="name">Full Name</label>
-      <input type="text" id="name" name="name" placeholder="Enter full name" required>
+      <input type="text" id="name" name="name" placeholder="e.g. Alice Chen" required>
     </div>
     <div class="form-group">
       <label for="email">Email Address</label>
-      <input type="email" id="email" name="email" placeholder="Enter email address" required>
+      <input type="email" id="email" name="email" placeholder="e.g. alice@company.com" required>
     </div>
-    <div class="form-group">
-      <label for="role">Role</label>
-      <select id="role" name="role">
-        <option value="employee">Employee</option>
-        <option value="admin">Admin</option>
-        <option value="contractor">Contractor</option>
-        <option value="guest">Guest</option>
-      </select>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role">
+          <option value="employee">Employee</option>
+          <option value="admin">Admin</option>
+          <option value="contractor">Contractor</option>
+          <option value="guest">Guest</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="department">Department</label>
+        <select id="department" name="department" required>
+          <option value="">— Select —</option>
+          {% for dept in departments %}
+          <option value="{{ dept }}">{{ dept }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
-    <div class="form-group">
-      <label for="department">Department</label>
-      <select id="department" name="department" required>
-        <option value="">— Select department —</option>
-        {% for dept in departments %}
-        <option value="{{ dept }}">{{ dept }}</option>
-        {% endfor %}
-      </select>
-    </div>
+
     <div class="form-group">
       <label for="license">License</label>
       <select id="license" name="license">
@@ -45,10 +50,14 @@
         <option value="Google Workspace Business">Google Workspace Business</option>
       </select>
     </div>
-    <div style="display:flex;gap:10px;margin-top:24px">
-      <button type="submit" class="btn btn-primary">Create User</button>
+
+    <div style="height:1px;background:var(--border);margin:20px 0"></div>
+
+    <div style="display:flex;gap:10px">
+      <button type="submit" class="btn btn-primary">⊕ Create User</button>
       <a href="/users" class="btn btn-outline">Cancel</a>
     </div>
   </form>
 </div>
+
 {% endblock %}

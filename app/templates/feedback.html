@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Feedback - IT Admin Panel{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2>User Feedback</h2>
+  <p>Ratings submitted after AI agent tasks</p>
+</div>
+
+{% if entries %}
+<!-- Summary bar -->
+{% set avg = (entries | map(attribute='rating') | sum) / entries|length %}
+<div class="card" style="display:flex;align-items:center;gap:28px;margin-bottom:16px;flex-wrap:wrap">
+  <div style="text-align:center">
+    <div style="font-size:40px;font-weight:800;color:var(--text)">{{ '%.1f' % avg }}</div>
+    <div style="font-size:12px;color:var(--muted)">avg rating</div>
+  </div>
+  <div>
+    {% for star in [5,4,3,2,1] %}
+    {% set count = entries | selectattr('rating','equalto', star) | list | length %}
+    {% set pct   = (count / entries|length * 100)|int %}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span style="font-size:12px;color:var(--muted);width:14px;text-align:right">{{ star }}</span>
+      <span style="font-size:11px">⭐</span>
+      <div style="width:140px;height:7px;background:var(--border);border-radius:10px;overflow:hidden">
+        <div style="width:{{ pct }}%;height:100%;background:var(--warning);border-radius:10px"></div>
+      </div>
+      <span style="font-size:12px;color:var(--muted)">{{ count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="margin-left:auto;text-align:right">
+    <div style="font-size:24px;font-weight:700;color:var(--text)">{{ entries|length }}</div>
+    <div style="font-size:12px;color:var(--muted)">total reviews</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Rating</th>
+          <th>Task</th>
+          <th>Comment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td style="font-size:12px;color:var(--muted);white-space:nowrap">{{ e.timestamp }}</td>
+          <td>
+            <span style="font-size:16px">{{ '⭐' * e.rating }}{{ '☆' * (5 - e.rating) }}</span>
+          </td>
+          <td style="font-size:12px;color:var(--text-2);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ e.task or '—' }}
+          </td>
+          <td style="font-size:13px;color:var(--muted)">{{ e.comment or '—' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not entries %}
+        <tr>
+          <td colspan="4" style="text-align:center;color:var(--muted);padding:48px;font-size:13px">
+            No feedback yet. Ratings appear here after users complete AI tasks.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

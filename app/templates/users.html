@@ -1,42 +1,52 @@
 {% extends "base.html" %}
 {% block title %}Users - IT Admin Panel{% endblock %}
 {% block content %}
+
 <div class="topbar">
   <div class="page-header" style="margin-bottom:0">
     <h2>Users</h2>
-    <p>{{ users | length }} total &nbsp;·&nbsp;
-       <span style="color:#38a169;font-weight:600">{{ active }} active</span> &nbsp;·&nbsp;
-       <span style="color:#e53e3e;font-weight:600">{{ inactive }} inactive</span>
+    <p>
+      {{ users | length }} total &nbsp;·&nbsp;
+      <span style="color:var(--success);font-weight:600">{{ active }} active</span>
+      &nbsp;·&nbsp;
+      <span style="color:var(--danger);font-weight:600">{{ inactive }} inactive</span>
     </p>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <input type="text" class="search-bar" id="searchInput"
-           placeholder="Search name, email, dept…" oninput="filterUsers()">
-    <a href="/create-user" class="btn btn-primary">+ Create User</a>
-    <a href="/export-csv"  class="btn btn-outline">&#11015; CSV</a>
+           placeholder="🔍  Search name, email, dept…" oninput="filterUsers()">
+    <a href="/create-user" class="btn btn-primary">⊕ Create User</a>
+    <a href="/export-csv"  class="btn btn-outline">↓ CSV</a>
   </div>
 </div>
 
 <div class="card">
   <form method="POST" action="/bulk-action" id="bulkForm">
-    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center" id="bulkBar">
-      <span style="font-size:13px;color:#666"><span id="selectedCount">0</span> selected</span>
+
+    <!-- Bulk action bar -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px;color:var(--muted)">
+        <span id="selectedCount" style="font-weight:700;color:var(--text)">0</span> selected
+      </span>
       <button type="submit" name="action" value="disable"
-              class="btn btn-outline btn-sm" onclick="return confirmBulk('disable')">Disable selected</button>
+              class="btn btn-outline btn-sm" onclick="return confirmBulk('disable')">
+        Disable
+      </button>
       <button type="submit" name="action" value="delete"
-              class="btn btn-danger btn-sm" onclick="return confirmBulk('delete')">Delete selected</button>
-      <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()">Clear</button>
+              class="btn btn-danger btn-sm" onclick="return confirmBulk('delete')">
+        Delete
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
     </div>
 
     <div class="table-wrap">
       <table id="userTable">
         <thead>
           <tr>
-            <th style="width:36px">
+            <th style="width:36px;padding-left:16px">
               <input type="checkbox" id="selectAll" onchange="toggleAll(this)">
             </th>
-            <th>Name</th>
-            <th>Email</th>
+            <th>User</th>
             <th>Status</th>
             <th>Role</th>
             <th>Department</th>
@@ -45,11 +55,25 @@
           </tr>
         </thead>
         <tbody id="userBody">
+          {% set colors = ['#6366f1','#8b5cf6','#ec4899','#06b6d4','#10b981','#f59e0b','#ef4444','#14b8a6'] %}
           {% for user in users %}
+          {% set ci = loop.index0 % 8 %}
           <tr data-search="{{ (user.name ~ ' ' ~ user.email ~ ' ' ~ user.department ~ ' ' ~ user.role) | lower }}">
-            <td><input type="checkbox" name="selected" value="{{ user.email }}" class="row-cb" onchange="updateCount()"></td>
-            <td><strong>{{ user.name }}</strong></td>
-            <td style="color:#555;font-size:13px">{{ user.email }}</td>
+            <td style="padding-left:16px">
+              <input type="checkbox" name="selected" value="{{ user.email }}"
+                     class="row-cb" onchange="updateCount()">
+            </td>
+            <td>
+              <div class="user-cell">
+                <div class="avatar" style="background:{{ colors[ci] }}">
+                  {{ user.name[:2].upper() }}
+                </div>
+                <div class="user-cell-info">
+                  <span class="user-cell-name">{{ user.name }}</span>
+                  <span class="user-cell-email">{{ user.email }}</span>
+                </div>
+              </div>
+            </td>
             <td>
               {% if user.status == 'active' %}
               <span class="badge badge-success">Active</span>
@@ -57,34 +81,53 @@
               <span class="badge badge-danger">Inactive</span>
               {% endif %}
             </td>
-            <td><span class="badge badge-info">{{ user.role | capitalize }}</span></td>
-            <td style="color:#666;font-size:13px">{{ user.department or '—' }}</td>
-            <td style="color:#666;font-size:12px">{{ user.license or 'None' }}</td>
+            <td>
+              {% if user.role == 'admin' %}
+              <span class="badge badge-purple">Admin</span>
+              {% elif user.role == 'contractor' %}
+              <span class="badge badge-warning">Contractor</span>
+              {% elif user.role == 'guest' %}
+              <span class="badge badge-gray">Guest</span>
+              {% else %}
+              <span class="badge badge-info">Employee</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--muted);font-size:13px">{{ user.department or '—' }}</td>
+            <td style="font-size:12px;color:var(--muted)">
+              {% if user.license and user.license != 'None' %}
+              <span class="badge badge-info" style="font-size:10px">{{ user.license }}</span>
+              {% else %}
+              <span style="color:#cbd5e1">—</span>
+              {% endif %}
+            </td>
             <td>
               <div class="action-btns">
-                <a href="/reset-password/{{ user.email }}" class="btn btn-warning btn-sm">Reset Password</a>
+                <a href="/reset-password/{{ user.email }}" class="btn btn-warning btn-sm" title="Reset Password">Reset PW</a>
                 {% if user.status == 'active' %}
                 <a href="/disable-user/{{ user.email }}" class="btn btn-outline btn-sm">Disable</a>
                 {% else %}
                 <a href="/enable-user/{{ user.email }}" class="btn btn-success btn-sm">Enable</a>
                 {% endif %}
-                <a href="/assign-license/{{ user.email }}" class="btn btn-outline btn-sm">Edit Role</a>
+                <a href="/assign-license/{{ user.email }}" class="btn btn-outline btn-sm">Edit</a>
                 <a href="/delete-user/{{ user.email }}" class="btn btn-danger btn-sm">Delete</a>
               </div>
             </td>
           </tr>
           {% endfor %}
+
           {% if not users %}
           <tr>
-            <td colspan="8" style="text-align:center;color:#999;padding:48px;font-size:14px">
-              No users found. <a href="/create-user" style="color:#4361ee">Create one</a>.
+            <td colspan="7" style="text-align:center;color:var(--muted);padding:52px;font-size:13px">
+              No users found.
+              <a href="/create-user" style="color:var(--accent);font-weight:600;margin-left:4px">Create one →</a>
             </td>
           </tr>
           {% endif %}
         </tbody>
       </table>
     </div>
-    <p id="noResults" style="display:none;text-align:center;color:#999;padding:32px;font-size:14px">
+
+    <p id="noResults" style="display:none;text-align:center;color:var(--muted);padding:36px;font-size:13px">
       No users match your search.
     </p>
   </form>
@@ -102,7 +145,6 @@ function filterUsers() {
   });
   document.getElementById('noResults').style.display = visible === 0 ? '' : 'none';
 }
-
 function toggleAll(cb) {
   document.querySelectorAll('.row-cb').forEach(c => {
     const row = c.closest('tr');
@@ -110,24 +152,21 @@ function toggleAll(cb) {
   });
   updateCount();
 }
-
 function updateCount() {
   const n = document.querySelectorAll('.row-cb:checked').length;
   document.getElementById('selectedCount').textContent = n;
   document.getElementById('selectAll').indeterminate =
     n > 0 && n < document.querySelectorAll('.row-cb').length;
 }
-
 function clearSelection() {
   document.querySelectorAll('.row-cb').forEach(c => c.checked = false);
   document.getElementById('selectAll').checked = false;
   updateCount();
 }
-
 function confirmBulk(action) {
   const n = document.querySelectorAll('.row-cb:checked').length;
   if (n === 0) { alert('Select at least one user.'); return false; }
-  return confirm(`${action.charAt(0).toUpperCase()+action.slice(1)} ${n} user(s)? This cannot be undone.`);
+  return confirm(`${action.charAt(0).toUpperCase()+action.slice(1)} ${n} user(s)?`);
 }
 </script>
 {% endblock %}

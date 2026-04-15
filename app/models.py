@@ -1,11 +1,14 @@
 import sqlite3
 import os
+import json
 from datetime import datetime
 from contextlib import contextmanager
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-_HERE    = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(_HERE, "..", "data", "users.db")
+_HERE        = os.path.dirname(os.path.abspath(__file__))
+DB_PATH      = os.path.join(_HERE, "..", "data", "users.db")
+PROFILE_PATH = os.path.join(_HERE, "..", "data", "profile.json")
+WEBAUTHN_PATH = os.path.join(_HERE, "..", "data", "webauthn.json")
 
 # ── DB connection ─────────────────────────────────────────────────────────────
 @contextmanager
@@ -193,3 +196,57 @@ def load_audit_log(limit: int = 100) -> list[dict]:
             "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+# ── Profile ───────────────────────────────────────────────────────────────────
+def load_profile() -> dict:
+    if os.path.exists(PROFILE_PATH):
+        with open(PROFILE_PATH) as f:
+            return json.load(f)
+    return {"name": "Admin", "title": "IT Administrator", "email": "", "phone": "", "photo": ""}
+
+
+def save_profile(data: dict) -> None:
+    os.makedirs(os.path.dirname(PROFILE_PATH), exist_ok=True)
+    with open(PROFILE_PATH, "w") as f:
+        json.dump(data, f)
+
+
+# ── Feedback ──────────────────────────────────────────────────────────────────
+def save_feedback(rating: int, comment: str, task: str = "") -> None:
+    with _db() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS feedback "
+            "(id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, rating INTEGER, comment TEXT, task TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO feedback (timestamp, rating, comment, task) VALUES (?,?,?,?)",
+            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rating, comment, task),
+        )
+
+
+def load_feedback() -> list[dict]:
+    with _db() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS feedback "
+            "(id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, rating INTEGER, comment TEXT, task TEXT)"
+        )
+        rows = conn.execute("SELECT * FROM feedback ORDER BY id DESC LIMIT 50").fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── WebAuthn credentials (demo) ───────────────────────────────────────────────
+def save_webauthn_credential(credential_id: str) -> None:
+    os.makedirs(os.path.dirname(WEBAUTHN_PATH), exist_ok=True)
+    creds = load_webauthn_credentials()
+    if credential_id not in creds:
+        creds.append(credential_id)
+    with open(WEBAUTHN_PATH, "w") as f:
+        json.dump(creds, f)
+
+
+def load_webauthn_credentials() -> list:
+    if os.path.exists(WEBAUTHN_PATH):
+        with open(WEBAUTHN_PATH) as f:
+            return json.load(f)
+    return []
