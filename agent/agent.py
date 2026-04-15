@@ -8,11 +8,9 @@ from config.settings import (
     BASE_URL, ADMIN_PASSWORD,
 )
 from agent.prompts import SYSTEM_PROMPT
-from browser.browser_controller import BrowserController
 
 # ---------------------------------------------------------------------------
-# LLM client — auto-selects Anthropic | Google Gemini | Ollama
-# Google uses its OpenAI-compatible endpoint (no extra library needed)
+# LLM client setup
 # ---------------------------------------------------------------------------
 
 _USE_ANTHROPIC = False
@@ -25,7 +23,6 @@ if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     _USE_ANTHROPIC = True
 
 elif LLM_BACKEND == "groq" and GROQ_API_KEY:
-    # Groq's OpenAI-compatible endpoint — works with standard openai SDK
     _groq_client = OpenAI(
         api_key=GROQ_API_KEY.strip(),
         base_url="https://api.groq.com/openai/v1",
@@ -35,20 +32,136 @@ elif LLM_BACKEND == "groq" and GROQ_API_KEY:
 else:
     _ollama_client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
 
+
 # ---------------------------------------------------------------------------
-# Tool definitions — OpenAI function-call format (works for Ollama + Google)
+# Tool definitions
 # ---------------------------------------------------------------------------
 
 TOOLS_OPENAI = [
+    # ── Direct admin tools (instant, no browser) ──────────────────────────
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_create_user",
+            "description": "Create a new user directly in the database. Use this for ALL create user tasks.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email":      {"type": "string", "description": "User email address"},
+                    "name":       {"type": "string", "description": "Full name"},
+                    "role":       {"type": "string", "description": "employee | admin | contractor | guest", "default": "employee"},
+                    "department": {"type": "string", "description": "Department (Engineering, HR, IT, Marketing, etc.)"},
+                    "license":    {"type": "string", "description": "License (None, Microsoft 365 E1/E3/E5, Google Workspace Basic/Business)", "default": "None"},
+                },
+                "required": ["email", "name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_find_user",
+            "description": "Look up a user by their email address.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string", "description": "Email address to look up"},
+                },
+                "required": ["email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_list_users",
+            "description": "List all users in the system.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_disable_user",
+            "description": "Disable a user account.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string"},
+                },
+                "required": ["email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_enable_user",
+            "description": "Enable a disabled user account.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string"},
+                },
+                "required": ["email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_delete_user",
+            "description": "Permanently delete a user account.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string"},
+                },
+                "required": ["email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_reset_password",
+            "description": "Reset a user's password.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string"},
+                },
+                "required": ["email"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "admin_assign_license",
+            "description": "Assign a license and/or role to a user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email":   {"type": "string"},
+                    "license": {"type": "string", "description": "License type"},
+                    "role":    {"type": "string", "description": "Role (optional)"},
+                },
+                "required": ["email", "license"],
+            },
+        },
+    },
+
+    # ── Browser tools (external websites only) ────────────────────────────
     {
         "type": "function",
         "function": {
             "name": "navigate",
-            "description": "Navigate the browser to a full URL on the admin panel.",
+            "description": "Navigate browser to a URL. Only use for external websites, NOT for admin panel tasks.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "Full URL, e.g. http://127.0.0.1:5000/users"}
+                    "url": {"type": "string"},
                 },
                 "required": ["url"],
             },
@@ -58,7 +171,7 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "read_page",
-            "description": "Read the current page content and URL to understand what is on screen.",
+            "description": "Read the current browser page content.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -66,12 +179,12 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "fill_input",
-            "description": "Fill a text/email input field identified by its label or placeholder text.",
+            "description": "Fill a text input field.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "label_or_placeholder": {"type": "string", "description": "Label or placeholder of the input"},
-                    "value": {"type": "string", "description": "Value to enter"},
+                    "label_or_placeholder": {"type": "string"},
+                    "value":               {"type": "string"},
                 },
                 "required": ["label_or_placeholder", "value"],
             },
@@ -81,12 +194,12 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "select_option",
-            "description": "Select an option from a dropdown by its label and option value.",
+            "description": "Select a dropdown option.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "label": {"type": "string", "description": "Label above the dropdown, e.g. 'Role'"},
-                    "value": {"type": "string", "description": "Option value/text to select"},
+                    "label": {"type": "string"},
+                    "value": {"type": "string"},
                 },
                 "required": ["label", "value"],
             },
@@ -96,11 +209,11 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "click_button",
-            "description": "Click a button on the page by its visible text.",
+            "description": "Click a button by visible text.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "text": {"type": "string", "description": "Visible text of the button"}
+                    "text": {"type": "string"},
                 },
                 "required": ["text"],
             },
@@ -110,11 +223,11 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "click_link",
-            "description": "Click a link on the page by its visible text.",
+            "description": "Click a link by visible text.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "text": {"type": "string", "description": "Visible text of the link"}
+                    "text": {"type": "string"},
                 },
                 "required": ["text"],
             },
@@ -124,11 +237,11 @@ TOOLS_OPENAI = [
         "type": "function",
         "function": {
             "name": "task_complete",
-            "description": "Call when the task has been fully completed.",
+            "description": "Call when the task is fully done.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "summary": {"type": "string", "description": "What was accomplished"}
+                    "summary": {"type": "string"},
                 },
                 "required": ["summary"],
             },
@@ -136,7 +249,6 @@ TOOLS_OPENAI = [
     },
 ]
 
-# Anthropic format
 TOOLS_ANTHROPIC = [
     {
         "name": t["function"]["name"],
@@ -148,10 +260,133 @@ TOOLS_ANTHROPIC = [
 
 
 # ---------------------------------------------------------------------------
-# Tool execution (shared by all backends)
+# Lazy browser — only opens if a browser tool is actually called
 # ---------------------------------------------------------------------------
 
-def _execute_tool(browser: BrowserController, name: str, inputs: dict) -> str:
+class _LazyBrowser:
+    def __init__(self):
+        self._ctrl = None
+
+    def get(self):
+        if self._ctrl is None:
+            from browser.browser_controller import BrowserController
+            self._ctrl = BrowserController()
+            _auto_login(self._ctrl)
+        return self._ctrl
+
+    def close(self):
+        if self._ctrl:
+            try:
+                self._ctrl.close()
+            except Exception:
+                pass
+
+
+def _auto_login(browser) -> None:
+    """Authenticate the Playwright browser on the admin panel."""
+    import time
+    try:
+        browser.go_to(f"{BASE_URL}/login")
+        time.sleep(0.3)
+        if "/login" not in browser.get_current_url():
+            return
+        browser._page.get_by_placeholder("Enter admin password").fill(ADMIN_PASSWORD)
+        browser._page.get_by_role("button", name="Sign In").click()
+        try:
+            browser._page.wait_for_url(lambda url: "/login" not in url, timeout=6000)
+        except Exception:
+            time.sleep(1.5)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Direct admin tool execution (no browser needed)
+# ---------------------------------------------------------------------------
+
+def _execute_direct_tool(name: str, inputs: dict) -> str:
+    from app.models import (
+        create_user as _create_user,
+        find_user as _find_user,
+        load_users as _load_users,
+        disable_user as _disable_user,
+        enable_user as _enable_user,
+        delete_user as _delete_user,
+        reset_password as _reset_password,
+        assign_license as _assign_license,
+        assign_role as _assign_role,
+        user_exists as _user_exists,
+    )
+
+    if name == "admin_create_user":
+        email = inputs.get("email", "").strip().lower()
+        uname = inputs.get("name", "").strip()
+        if not email or not uname:
+            return "Error: email and name are required."
+        if _user_exists(email):
+            return f"User {email} already exists — skipping creation."
+        user = _create_user(
+            email, uname,
+            inputs.get("role", "employee"),
+            inputs.get("department", ""),
+            inputs.get("license", "None"),
+        )
+        return (
+            f"✅ Created user: {user['name']} ({email}) "
+            f"| Role: {user['role']} | Dept: {user.get('department','—')} "
+            f"| License: {user.get('license','None')}"
+        )
+
+    elif name == "admin_find_user":
+        user = _find_user(inputs.get("email", ""))
+        if not user:
+            return f"User '{inputs.get('email','')}' not found."
+        return (
+            f"Found: {user['name']} ({user['email']}) "
+            f"| {user['role']} in {user.get('department','—')} "
+            f"| Status: {user['status']} | License: {user.get('license','None')}"
+        )
+
+    elif name == "admin_list_users":
+        users = _load_users()
+        if not users:
+            return "No users in the system."
+        return "\n".join(
+            f"- {u['name']} ({u['email']}) [{u['status']}] {u['role']} / {u.get('department','—')}"
+            for u in users
+        )
+
+    elif name == "admin_disable_user":
+        ok = _disable_user(inputs.get("email", ""))
+        return "✅ User disabled." if ok else "User not found."
+
+    elif name == "admin_enable_user":
+        ok = _enable_user(inputs.get("email", ""))
+        return "✅ User enabled." if ok else "User not found."
+
+    elif name == "admin_delete_user":
+        ok = _delete_user(inputs.get("email", ""))
+        return "✅ User deleted permanently." if ok else "User not found."
+
+    elif name == "admin_reset_password":
+        ok = _reset_password(inputs.get("email", ""))
+        return "✅ Password reset successfully." if ok else "User not found."
+
+    elif name == "admin_assign_license":
+        email = inputs.get("email", "")
+        ok = _assign_license(email, inputs.get("license", "None"))
+        if inputs.get("role"):
+            _assign_role(email, inputs["role"])
+        return f"✅ License/role updated for {email}." if ok else "User not found."
+
+    return f"Unknown direct tool: {name}"
+
+
+# ---------------------------------------------------------------------------
+# Browser tool execution
+# ---------------------------------------------------------------------------
+
+def _execute_browser_tool(browser, name: str, inputs: dict) -> str:
     try:
         if name == "navigate":
             browser.go_to(inputs["url"])
@@ -166,16 +401,34 @@ def _execute_tool(browser: BrowserController, name: str, inputs: dict) -> str:
             return browser.click_button(inputs["text"])
         elif name == "click_link":
             return browser.click_link(inputs["text"])
-        elif name == "task_complete":
-            return f"TASK_COMPLETE: {inputs['summary']}"
         else:
-            return f"Unknown tool: {name}"
+            return f"Unknown browser tool: {name}"
     except Exception as e:
         return f"Error in {name}: {e}"
 
 
 # ---------------------------------------------------------------------------
-# Shared OpenAI-compatible agent loop (used by Ollama AND Google)
+# Unified tool dispatcher
+# ---------------------------------------------------------------------------
+
+_DIRECT_TOOLS = {
+    "admin_create_user", "admin_find_user", "admin_list_users",
+    "admin_disable_user", "admin_enable_user", "admin_delete_user",
+    "admin_reset_password", "admin_assign_license",
+}
+
+
+def _execute_tool(lazy_browser: _LazyBrowser, name: str, inputs: dict) -> str:
+    if name in _DIRECT_TOOLS:
+        return _execute_direct_tool(name, inputs)
+    if name == "task_complete":
+        return f"TASK_COMPLETE: {inputs.get('summary', 'Done.')}"
+    # Browser tools
+    return _execute_browser_tool(lazy_browser.get(), name, inputs)
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible agent loop (Groq / Ollama)
 # ---------------------------------------------------------------------------
 
 def _run_openai_compatible(
@@ -183,24 +436,25 @@ def _run_openai_compatible(
     model: str,
     task: str,
     log,
-    browser: BrowserController,
+    lazy_browser: _LazyBrowser,
     prompt: str = None,
 ) -> str:
     messages = [
         {"role": "system", "content": prompt or SYSTEM_PROMPT},
-        {"role": "user", "content": task},
+        {"role": "user",   "content": task},
     ]
     result = "Task could not be completed."
 
-    for _ in range(25):
+    for _ in range(20):
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             tools=TOOLS_OPENAI,
             tool_choice="auto",
+            max_tokens=1024,
         )
 
-        msg = response.choices[0].message
+        msg    = response.choices[0].message
         finish = response.choices[0].finish_reason
 
         assistant_entry: dict = {"role": "assistant", "content": msg.content or ""}
@@ -238,14 +492,14 @@ def _run_openai_compatible(
                 log("COMPLETE", result)
                 return result
 
-            tool_result = _execute_tool(browser, name, args)
-            short = tool_result[:300] + "..." if len(tool_result) > 300 else tool_result
+            tool_result = _execute_tool(lazy_browser, name, args)
+            short = tool_result[:400] + "…" if len(tool_result) > 400 else tool_result
             log("RESULT", short)
 
             tool_results.append({
-                "role": "tool",
+                "role":         "tool",
                 "tool_call_id": tc.id,
-                "content": tool_result,
+                "content":      tool_result,
             })
 
         messages.extend(tool_results)
@@ -257,11 +511,13 @@ def _run_openai_compatible(
 # Anthropic agent loop
 # ---------------------------------------------------------------------------
 
-def _run_anthropic(task: str, log, browser: BrowserController, prompt: str = None) -> str:
+def _run_anthropic(
+    task: str, log, lazy_browser: _LazyBrowser, prompt: str = None
+) -> str:
     messages = [{"role": "user", "content": task}]
-    result = "Task could not be completed."
+    result   = "Task could not be completed."
 
-    for _ in range(25):
+    for _ in range(20):
         response = _anthropic_client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,
@@ -294,40 +550,14 @@ def _run_anthropic(task: str, log, browser: BrowserController, prompt: str = Non
                         messages.append({"role": "user", "content": tool_results})
                         return result
 
-                    tool_result = _execute_tool(browser, block.name, block.input)
-                    short = tool_result[:300] + "..." if len(tool_result) > 300 else tool_result
+                    tool_result = _execute_tool(lazy_browser, block.name, block.input)
+                    short = tool_result[:400] + "…" if len(tool_result) > 400 else tool_result
                     log("RESULT", short)
                     tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": tool_result})
 
             messages.append({"role": "user", "content": tool_results})
 
     return result
-
-
-# ---------------------------------------------------------------------------
-# Auto-login helper — silently authenticates the Playwright browser
-# ---------------------------------------------------------------------------
-
-def _auto_login(browser: BrowserController) -> None:
-    """Navigate to the admin panel login page and authenticate."""
-    import time
-    try:
-        browser.go_to(f"{BASE_URL}/login")
-        time.sleep(0.3)
-        # If already redirected away from login, we're authenticated
-        if "/login" not in browser.get_current_url():
-            return
-        browser._page.get_by_placeholder("Enter admin password").fill(ADMIN_PASSWORD)
-        browser._page.get_by_role("button", name="Sign In").click()
-        # Wait until the browser leaves /login (redirect to dashboard)
-        try:
-            browser._page.wait_for_url(
-                lambda url: "/login" not in url, timeout=6000
-            )
-        except Exception:
-            time.sleep(1.5)  # fallback
-    except Exception:
-        pass  # already logged in or non-critical error
 
 
 # ---------------------------------------------------------------------------
@@ -351,24 +581,23 @@ def run_agent(
         backend = f"Groq ({_GROQ_MODEL})"
     else:
         backend = f"Ollama ({OLLAMA_MODEL})"
+
     log("START", f"Task: {task}  |  Backend: {backend}")
 
-    browser = BrowserController()
+    lazy_browser = _LazyBrowser()
     try:
-        _auto_login(browser)  # authenticate Playwright browser before task
         if start_url:
-            browser.go_to(start_url)
+            lazy_browser.get().go_to(start_url)
+
         if _USE_ANTHROPIC:
-            return _run_anthropic(task, log, browser, system_prompt)
+            return _run_anthropic(task, log, lazy_browser, system_prompt)
         elif _USE_GROQ:
-            return _run_openai_compatible(_groq_client, _GROQ_MODEL, task, log, browser, system_prompt)
+            return _run_openai_compatible(_groq_client, _GROQ_MODEL, task, log, lazy_browser, system_prompt)
         else:
-            return _run_openai_compatible(_ollama_client, OLLAMA_MODEL, task, log, browser, system_prompt)
+            return _run_openai_compatible(_ollama_client, OLLAMA_MODEL, task, log, lazy_browser, system_prompt)
+
     except Exception as e:
         log("ERROR", str(e))
         return f"Error: {e}"
     finally:
-        try:
-            browser.close()
-        except Exception:
-            pass
+        lazy_browser.close()
