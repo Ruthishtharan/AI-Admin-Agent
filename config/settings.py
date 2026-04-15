@@ -9,7 +9,10 @@ IS_REPLIT = bool(os.getenv("REPL_ID") or os.getenv("REPL_SLUG"))
 # Anthropic (optional — only used if LLM_BACKEND=anthropic)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
-# LLM backend: "ollama" (default, free) or "anthropic"
+# Google Gemini (optional — only used if LLM_BACKEND=google)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+
+# LLM backend: "ollama" (default, free) | "anthropic" | "google"
 LLM_BACKEND = os.getenv("LLM_BACKEND", "ollama")
 
 # Ollama settings (free local LLM — no API key needed)

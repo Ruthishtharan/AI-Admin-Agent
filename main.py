@@ -4,7 +4,7 @@ import threading
 import time
 
 from app import create_app
-from config.settings import ANTHROPIC_API_KEY, LLM_BACKEND, OLLAMA_MODEL, FLASK_PORT
+from config.settings import ANTHROPIC_API_KEY, GOOGLE_API_KEY, LLM_BACKEND, OLLAMA_MODEL, FLASK_PORT
 
 # Detect if running on Replit
 IS_REPLIT = bool(os.getenv("REPL_ID") or os.getenv("REPL_SLUG"))
@@ -34,7 +34,16 @@ def main():
             else:
                 print("  → Add it to your .env file: ANTHROPIC_API_KEY=sk-ant-...")
             sys.exit(1)
-        print(f"[OK] Anthropic API key loaded  (model: claude-sonnet-4-6)")
+        print("[OK] Anthropic API key loaded  (model: claude-sonnet-4-6)")
+    elif LLM_BACKEND == "google":
+        if not GOOGLE_API_KEY:
+            print("\n[ERROR] LLM_BACKEND=google but GOOGLE_API_KEY is not set.")
+            if IS_REPLIT:
+                print("  → Add it in Replit Secrets: GOOGLE_API_KEY = AIzaSy...")
+            else:
+                print("  → Add it to your .env file: GOOGLE_API_KEY=AIzaSy...")
+            sys.exit(1)
+        print("[OK] Google API key loaded  (model: gemini-1.5-flash)")
     elif not IS_REPLIT:
         # Ollama mode — only check locally (Ollama can't run on Replit)
         if not check_ollama():
@@ -61,7 +70,12 @@ def main():
     flask_thread.start()
     time.sleep(1.2)
 
-    backend_label = "Anthropic claude-sonnet-4-6" if LLM_BACKEND == "anthropic" else f"Ollama / {OLLAMA_MODEL}"
+    if LLM_BACKEND == "anthropic":
+        backend_label = "Anthropic claude-sonnet-4-6"
+    elif LLM_BACKEND == "google":
+        backend_label = "Google Gemini (gemini-1.5-flash)"
+    else:
+        backend_label = f"Ollama / {OLLAMA_MODEL}"
 
     if IS_REPLIT:
         print(f"\n{'='*54}")
