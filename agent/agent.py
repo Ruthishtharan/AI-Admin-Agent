@@ -5,6 +5,7 @@ from openai import OpenAI
 from config.settings import (
     ANTHROPIC_API_KEY, GROQ_API_KEY,
     LLM_BACKEND, OLLAMA_URL, OLLAMA_MODEL,
+    BASE_URL, ADMIN_PASSWORD,
 )
 from agent.prompts import SYSTEM_PROMPT
 from browser.browser_controller import BrowserController
@@ -16,7 +17,7 @@ from browser.browser_controller import BrowserController
 
 _USE_ANTHROPIC = False
 _USE_GROQ      = False
-_GROQ_MODEL    = "llama-3.1-70b-versatile"
+_GROQ_MODEL    = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     import anthropic as _anthropic
@@ -24,9 +25,9 @@ if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     _USE_ANTHROPIC = True
 
 elif LLM_BACKEND == "groq" and GROQ_API_KEY:
-    # Google's OpenAI-compatible endpoint — works with standard openai SDK
-    _google_client = OpenAI(
-        api_key=GROQ_API_KEY,
+    # Groq's OpenAI-compatible endpoint — works with standard openai SDK
+    _groq_client = OpenAI(
+        api_key=GROQ_API_KEY.strip(),
         base_url="https://api.groq.com/openai/v1",
     )
     _USE_GROQ = True
@@ -304,6 +305,23 @@ def _run_anthropic(task: str, log, browser: BrowserController, prompt: str = Non
 
 
 # ---------------------------------------------------------------------------
+# Auto-login helper — silently authenticates the Playwright browser
+# ---------------------------------------------------------------------------
+
+def _auto_login(browser: BrowserController) -> None:
+    """Navigate to the admin panel login page and authenticate."""
+    import time
+    try:
+        browser.go_to(f"{BASE_URL}/login")
+        time.sleep(0.3)
+        browser._page.get_by_placeholder("Enter admin password").fill(ADMIN_PASSWORD)
+        browser._page.get_by_role("button", name="Sign In").click()
+        time.sleep(0.5)
+    except Exception:
+        pass  # If already logged in or login page not reached, continue
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -328,6 +346,7 @@ def run_agent(
 
     browser = BrowserController()
     try:
+        _auto_login(browser)  # authenticate Playwright browser before task
         if start_url:
             browser.go_to(start_url)
         if _USE_ANTHROPIC:
