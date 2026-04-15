@@ -7,7 +7,7 @@
     "status": "active",
     "license": "Microsoft 365 E3",
     "created_at": "2024-01-10",
-    "password_reset_at": null
+    "password_reset_at": "2026-04-15 17:11"
   },
   {
     "email": "jane.smith@company.com",
@@ -37,6 +37,16 @@
     "status": "active",
     "license": "Microsoft 365 E1",
     "created_at": "2024-02-05",
+    "password_reset_at": null
+  },
+  {
+    "email": "mike.ross@company.com",
+    "name": "Mike Ross",
+    "role": "contractor",
+    "department": "Legal",
+    "status": "active",
+    "license": "None",
+    "created_at": "2026-04-15",
     "password_reset_at": null
   }
 ]
