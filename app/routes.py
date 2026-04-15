@@ -17,6 +17,7 @@ from app.models import (
     bulk_disable, bulk_delete, load_audit_log, _audit,
     load_profile, save_profile, save_feedback, load_feedback,
     save_webauthn_credential, load_webauthn_credentials,
+    save_pin, verify_pin, has_pin,
 )
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
@@ -314,6 +315,30 @@ def register_routes(app):
     @login_required
     def feedback_page():
         return render_template("feedback.html", entries=load_feedback())
+
+    # ── PIN auth ──────────────────────────────────────────────────────────────
+    @app.route("/api/pin/set", methods=["POST"])
+    def pin_set():
+        data = request.get_json() or {}
+        pin_hash = data.get("hash", "")
+        if pin_hash and len(pin_hash) == 64:   # SHA-256 hex = 64 chars
+            save_pin(pin_hash)
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Invalid PIN hash"}), 400
+
+    @app.route("/api/pin/auth", methods=["POST"])
+    def pin_auth():
+        data = request.get_json() or {}
+        pin_hash = data.get("hash", "")
+        if verify_pin(pin_hash):
+            session["authenticated"] = True
+            _audit("login", details="PIN sign-in", actor="admin")
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Incorrect PIN"}), 401
+
+    @app.route("/api/pin/exists")
+    def pin_exists():
+        return jsonify({"exists": has_pin()})
 
     # ── WebAuthn (demo) ───────────────────────────────────────────────────────
     @app.route("/api/webauthn/register", methods=["POST"])

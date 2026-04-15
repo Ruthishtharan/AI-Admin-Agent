@@ -11,10 +11,10 @@ class BrowserController:
         self._pw = sync_playwright().start()
         self._browser = self._pw.chromium.launch(
             headless=HEADLESS,
-            slow_mo=80 if not HEADLESS else 0,  # Visible pacing for demos
+            slow_mo=20 if not HEADLESS else 0,
         )
         self._page = self._browser.new_page(viewport={"width": 1280, "height": 800})
-        self._page.set_default_timeout(8000)
+        self._page.set_default_timeout(6000)
 
     # ------------------------------------------------------------------
     # Navigation

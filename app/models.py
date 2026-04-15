@@ -5,17 +5,24 @@ from datetime import datetime
 from contextlib import contextmanager
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-_HERE        = os.path.dirname(os.path.abspath(__file__))
-DB_PATH      = os.path.join(_HERE, "..", "data", "users.db")
-PROFILE_PATH = os.path.join(_HERE, "..", "data", "profile.json")
+_HERE         = os.path.dirname(os.path.abspath(__file__))
+DB_PATH       = os.path.join(_HERE, "..", "data", "users.db")
+PROFILE_PATH  = os.path.join(_HERE, "..", "data", "profile.json")
 WEBAUTHN_PATH = os.path.join(_HERE, "..", "data", "webauthn.json")
+PIN_PATH      = os.path.join(_HERE, "..", "data", "pin.json")
 
 # ── DB connection ─────────────────────────────────────────────────────────────
 @contextmanager
 def _db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # Performance tuning
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=10000")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA mmap_size=268435456")
     try:
         yield conn
         conn.commit()
@@ -233,6 +240,24 @@ def load_feedback() -> list[dict]:
         )
         rows = conn.execute("SELECT * FROM feedback ORDER BY id DESC LIMIT 50").fetchall()
         return [dict(r) for r in rows]
+
+
+# ── PIN auth ─────────────────────────────────────────────────────────────────
+def save_pin(pin_hash: str) -> None:
+    os.makedirs(os.path.dirname(PIN_PATH), exist_ok=True)
+    with open(PIN_PATH, "w") as f:
+        json.dump({"hash": pin_hash}, f)
+
+
+def verify_pin(pin_hash: str) -> bool:
+    if not os.path.exists(PIN_PATH):
+        return False
+    with open(PIN_PATH) as f:
+        return json.load(f).get("hash") == pin_hash
+
+
+def has_pin() -> bool:
+    return os.path.exists(PIN_PATH)
 
 
 # ── WebAuthn credentials (demo) ───────────────────────────────────────────────

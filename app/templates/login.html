@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — IT Admin Panel</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
     body {
-      font-family:'Inter',sans-serif;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
       min-height:100vh;
       display:flex; align-items:center; justify-content:center;
       background:#060d1f;
@@ -168,13 +167,10 @@
 
     <div class="divider">or</div>
 
-    <button class="btn-bio" id="bioBtn" onclick="biometricLogin()">
-      <span class="bio-icon">🔐</span>
-      Sign in with Biometrics
-    </button>
-    <button class="btn-bio" id="bioRegBtn" onclick="biometricRegister()"
-            style="margin-top:8px;font-size:12px;padding:8px">
-      <span style="font-size:14px">⊕</span> Register this device
+    <!-- PIN quick login -->
+    <button class="btn-bio" id="pinLoginBtn" onclick="showPinDialog('login')">
+      <span class="bio-icon">🔑</span>
+      Quick PIN Login
     </button>
     <div id="bioStatus"></div>
   </div>
@@ -182,150 +178,190 @@
   <p class="hint">Default password: <code>admin123</code></p>
 </div>
 
+<!-- PIN dialog -->
+<div id="pinDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+     z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+  <div style="background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:16px;
+              padding:28px;width:320px;box-shadow:0 24px 64px rgba(0,0,0,.5);text-align:center">
+    <div style="font-size:36px;margin-bottom:12px" id="pinDialogIcon">🔑</div>
+    <h3 style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:6px" id="pinDialogTitle">Quick PIN Login</h3>
+    <p style="color:#64748b;font-size:13px;margin-bottom:20px" id="pinDialogSub">Enter your PIN to sign in</p>
+
+    <!-- PIN dots display -->
+    <div id="pinDots" style="display:flex;justify-content:center;gap:10px;margin-bottom:20px">
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+
+    <!-- Numpad -->
+    <div id="pinPad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto 16px">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key" onclick="pinClear()" style="font-size:12px;color:#94a3b8">CLR</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key" onclick="pinBackspace()">⌫</button>
+    </div>
+
+    <div id="pinMsg" style="font-size:12px;min-height:18px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button id="pinSubmitBtn" onclick="pinSubmit()"
+              style="padding:9px 24px;background:linear-gradient(135deg,#6366f1,#4f46e5);
+                     color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+        Sign In
+      </button>
+      <button onclick="closePinDialog()"
+              style="padding:9px 18px;background:transparent;border:1px solid rgba(255,255,255,.1);
+                     color:#64748b;border-radius:8px;font-size:13px;cursor:pointer">
+        Cancel
+      </button>
+      <button id="setPinBtn" onclick="showPinDialog('set')" style="display:none;
+              padding:9px 14px;background:transparent;border:1px solid rgba(255,255,255,.1);
+              color:#64748b;border-radius:8px;font-size:12px;cursor:pointer">
+        Set PIN
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+.pin-dot {
+  width:12px;height:12px;border-radius:50%;
+  background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);
+  transition:background .15s;
+}
+.pin-dot.filled { background:#6366f1;border-color:#6366f1;box-shadow:0 0 8px rgba(99,102,241,.5); }
+.pin-key {
+  padding:14px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);border-radius:10px;
+  color:#f1f5f9;font-size:18px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:all .15s;
+}
+.pin-key:hover { background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.4); }
+.pin-key:active { transform:scale(.94); }
+</style>
+
 <!-- Canvas particle animation -->
 <script>
 (function(){
   const canvas = document.getElementById('bg');
   const ctx    = canvas.getContext('2d');
-  let W, H, particles = [], lines = [];
-
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-
-  function Particle() {
-    this.x  = Math.random() * W;
-    this.y  = Math.random() * H;
-    this.vx = (Math.random() - .5) * .4;
-    this.vy = (Math.random() - .5) * .4;
-    this.r  = Math.random() * 1.5 + .5;
-    this.a  = Math.random() * .6 + .2;
-  }
-
-  function init() {
-    resize();
-    particles = Array.from({length: 90}, () => new Particle());
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
-    // Grid lines
-    ctx.strokeStyle = 'rgba(99,102,241,0.04)';
-    ctx.lineWidth   = 1;
-    const step = 60;
-    for (let x = 0; x < W; x += step) {
-      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
-    }
-    for (let y = 0; y < H; y += step) {
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
-    }
-
-    // Particles + connections
-    particles.forEach((p, i) => {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < 0 || p.x > W) p.vx *= -1;
-      if (p.y < 0 || p.y > H) p.vy *= -1;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-      ctx.fillStyle = `rgba(139,92,246,${p.a})`;
-      ctx.fill();
-
-      for (let j = i+1; j < particles.length; j++) {
-        const q = particles[j];
-        const d = Math.hypot(p.x-q.x, p.y-q.y);
-        if (d < 120) {
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
-          ctx.strokeStyle = `rgba(99,102,241,${.15*(1-d/120)})`;
-          ctx.lineWidth   = .6;
-          ctx.stroke();
-        }
+  let W, H, particles = [];
+  function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+  function Particle(){ this.x=Math.random()*W; this.y=Math.random()*H; this.vx=(Math.random()-.5)*.4; this.vy=(Math.random()-.5)*.4; this.r=Math.random()*1.5+.5; this.a=Math.random()*.5+.15; }
+  function init(){ resize(); particles=Array.from({length:80},()=>new Particle()); }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(99,102,241,0.04)'; ctx.lineWidth=1;
+    for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    particles.forEach((p,i)=>{
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(139,92,246,${p.a})`; ctx.fill();
+      for(let j=i+1;j<particles.length;j++){
+        const q=particles[j],d=Math.hypot(p.x-q.x,p.y-q.y);
+        if(d<120){ ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y);
+          ctx.strokeStyle=`rgba(99,102,241,${.14*(1-d/120)})`; ctx.lineWidth=.6; ctx.stroke(); }
       }
     });
-
     requestAnimationFrame(draw);
   }
-
-  window.addEventListener('resize', resize);
-  init();
-  draw();
+  window.addEventListener('resize',resize); init(); draw();
 })();
 </script>
 
-<!-- WebAuthn biometrics -->
+<!-- PIN auth -->
 <script>
-function bioStatus(msg, cls) {
-  const el = document.getElementById('bioStatus');
-  el.textContent = msg;
-  el.className   = cls || '';
-}
+let pinValue = '';
+let pinMode  = 'login'; // 'login' or 'set'
 
-async function biometricRegister() {
-  if (!window.PublicKeyCredential) {
-    bioStatus('Biometrics not supported in this browser.', 'err'); return;
-  }
-  try {
-    bioStatus('Waiting for biometric…');
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
-    const cred = await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp:   { name: 'IT Admin Panel' },
-        user: { id: new TextEncoder().encode('admin'), name: 'admin', displayName: 'Admin' },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-        authenticatorSelection: { userVerification: 'required' },
-        timeout: 30000,
-      }
-    });
-    const credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-    const res = await fetch('/api/webauthn/register', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ credentialId: credId }),
-    });
-    if ((await res.json()).ok) {
-      localStorage.setItem('bioCredId', credId);
-      bioStatus('Device registered! You can now sign in with biometrics.', 'ok');
-    }
-  } catch(e) {
-    bioStatus('Registration cancelled or failed: ' + e.message, 'err');
-  }
-}
+function pinMsg(msg, color){ const el=document.getElementById('pinMsg'); el.textContent=msg; el.style.color=color||'#64748b'; }
 
-async function biometricLogin() {
-  if (!window.PublicKeyCredential) {
-    bioStatus('Biometrics not supported in this browser.', 'err'); return;
-  }
-  try {
-    bioStatus('Waiting for biometric…');
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
-    const cred = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        userVerification: 'required',
-        timeout: 30000,
-      }
-    });
-    const credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-    const res = await fetch('/api/webauthn/authenticate', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ credentialId: credId }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      bioStatus('Authenticated! Redirecting…', 'ok');
-      setTimeout(() => location.href = '/', 600);
+async function showPinDialog(mode){
+  pinValue=''; pinMode=mode;
+  updatePinDots();
+  pinMsg('');
+  const dialog = document.getElementById('pinDialog');
+  dialog.style.display='flex';
+
+  if(mode==='set'){
+    document.getElementById('pinDialogIcon').textContent='🔐';
+    document.getElementById('pinDialogTitle').textContent='Set Quick PIN';
+    document.getElementById('pinDialogSub').textContent='Choose a 4–6 digit PIN for quick login';
+    document.getElementById('pinSubmitBtn').textContent='Save PIN';
+    document.getElementById('setPinBtn').style.display='none';
+  } else {
+    document.getElementById('pinDialogIcon').textContent='🔑';
+    document.getElementById('pinDialogTitle').textContent='Quick PIN Login';
+    const exists = await fetch('/api/pin/exists').then(r=>r.json()).then(d=>d.exists).catch(()=>false);
+    if(!exists){
+      pinMsg('No PIN set yet. Set one first.','#f59e0b');
+      document.getElementById('setPinBtn').style.display='';
+      document.getElementById('pinSubmitBtn').style.display='none';
     } else {
-      bioStatus('Device not recognized. Register first.', 'err');
+      document.getElementById('pinDialogSub').textContent='Enter your PIN to sign in instantly';
+      document.getElementById('pinSubmitBtn').style.display='';
+      document.getElementById('pinSubmitBtn').textContent='Sign In';
+      document.getElementById('setPinBtn').style.display='none';
     }
-  } catch(e) {
-    bioStatus('Biometric sign-in cancelled.', 'err');
   }
 }
+
+function closePinDialog(){ document.getElementById('pinDialog').style.display='none'; pinValue=''; updatePinDots(); }
+
+function pinKey(d){
+  if(pinValue.length>=6) return;
+  pinValue+=d; updatePinDots();
+  if(pinMode==='login' && pinValue.length>=4) setTimeout(pinSubmit,200);
+}
+function pinBackspace(){ pinValue=pinValue.slice(0,-1); updatePinDots(); }
+function pinClear(){ pinValue=''; updatePinDots(); }
+
+function updatePinDots(){
+  document.querySelectorAll('.pin-dot').forEach((d,i)=>{
+    d.classList.toggle('filled', i<pinValue.length);
+  });
+}
+
+async function hashPin(pin){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function pinSubmit(){
+  if(pinValue.length < 4){ pinMsg('PIN must be at least 4 digits','#ef4444'); return; }
+  const hash = await hashPin(pinValue);
+
+  if(pinMode==='set'){
+    const res = await fetch('/api/pin/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hash})});
+    const data = await res.json();
+    if(data.ok){ pinMsg('PIN saved! You can now use Quick Login.','#34d399'); setTimeout(closePinDialog,1500); }
+    else        { pinMsg('Failed to save PIN.','#ef4444'); }
+  } else {
+    const res = await fetch('/api/pin/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hash})});
+    const data = await res.json();
+    if(data.ok){ pinMsg('✓ Signing in…','#34d399'); setTimeout(()=>location.href='/',500); }
+    else        { pinMsg('Incorrect PIN. Try again.','#ef4444'); pinValue=''; updatePinDots(); }
+  }
+}
+
+// Keyboard support
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('pinDialog').style.display!=='flex') return;
+  if(e.key>='0'&&e.key<='9') pinKey(e.key);
+  else if(e.key==='Backspace') pinBackspace();
+  else if(e.key==='Enter') pinSubmit();
+  else if(e.key==='Escape') closePinDialog();
+});
 </script>
 </body>
 </html>
