@@ -38,11 +38,15 @@ def register_routes(app):
             email = request.form.get("email", "").strip()
             name = request.form.get("name", "").strip()
             role = request.form.get("role", "employee")
-            department = request.form.get("department", "").strip()
+            department = request.form.get("department", "").strip().title()
             license_type = request.form.get("license", "None")
 
             if not email or not name:
                 flash("Email and name are required.", "danger")
+                return render_template("create_user.html")
+
+            if not department:
+                flash("Department is required.", "danger")
                 return render_template("create_user.html")
 
             if user_exists(email):
