@@ -1,0 +1,14 @@
+modules = ["python-3.11"]
+run = "bash startup.sh"
+entrypoint = "main.py"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "bash startup.sh"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
