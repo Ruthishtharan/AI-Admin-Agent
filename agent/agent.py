@@ -16,7 +16,7 @@ from browser.browser_controller import BrowserController
 
 _USE_ANTHROPIC = False
 _USE_GOOGLE    = False
-_GOOGLE_MODEL  = "gemini-2.0-flash"
+_GOOGLE_MODEL  = "gemini-1.5-flash"
 
 if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     import anthropic as _anthropic
