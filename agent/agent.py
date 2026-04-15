@@ -11,10 +11,12 @@ from browser.browser_controller import BrowserController
 
 # ---------------------------------------------------------------------------
 # LLM client — auto-selects Anthropic | Google Gemini | Ollama
+# Google uses its OpenAI-compatible endpoint (no extra library needed)
 # ---------------------------------------------------------------------------
 
 _USE_ANTHROPIC = False
 _USE_GOOGLE    = False
+_GOOGLE_MODEL  = "gemini-2.0-flash"
 
 if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     import anthropic as _anthropic
@@ -22,20 +24,18 @@ if LLM_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
     _USE_ANTHROPIC = True
 
 elif LLM_BACKEND == "google" and GOOGLE_API_KEY:
-    import google.generativeai as genai
-    genai.configure(api_key=GOOGLE_API_KEY)
-    _gemini_model = genai.GenerativeModel(
-        model_name="gemini-pro",
-        system_instruction=SYSTEM_PROMPT,
+    # Google's OpenAI-compatible endpoint — works with standard openai SDK
+    _google_client = OpenAI(
+        api_key=GOOGLE_API_KEY,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
     )
     _USE_GOOGLE = True
 
 else:
     _ollama_client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
-    _USE_ANTHROPIC = False
 
 # ---------------------------------------------------------------------------
-# Tool definitions — OpenAI function-call format (Ollama-compatible)
+# Tool definitions — OpenAI function-call format (works for Ollama + Google)
 # ---------------------------------------------------------------------------
 
 TOOLS_OPENAI = [
@@ -135,7 +135,7 @@ TOOLS_OPENAI = [
     },
 ]
 
-# Anthropic format (used when ANTHROPIC_API_KEY is set)
+# Anthropic format
 TOOLS_ANTHROPIC = [
     {
         "name": t["function"]["name"],
@@ -147,7 +147,7 @@ TOOLS_ANTHROPIC = [
 
 
 # ---------------------------------------------------------------------------
-# Tool execution (shared by both backends)
+# Tool execution (shared by all backends)
 # ---------------------------------------------------------------------------
 
 def _execute_tool(browser: BrowserController, name: str, inputs: dict) -> str:
@@ -174,10 +174,17 @@ def _execute_tool(browser: BrowserController, name: str, inputs: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Ollama / OpenAI-compatible agent loop
+# Shared OpenAI-compatible agent loop (used by Ollama AND Google)
 # ---------------------------------------------------------------------------
 
-def _run_ollama(task: str, log, browser: BrowserController, prompt: str = None) -> str:
+def _run_openai_compatible(
+    client: OpenAI,
+    model: str,
+    task: str,
+    log,
+    browser: BrowserController,
+    prompt: str = None,
+) -> str:
     messages = [
         {"role": "system", "content": prompt or SYSTEM_PROMPT},
         {"role": "user", "content": task},
@@ -185,8 +192,8 @@ def _run_ollama(task: str, log, browser: BrowserController, prompt: str = None) 
     result = "Task could not be completed."
 
     for _ in range(25):
-        response = _ollama_client.chat.completions.create(
-            model=OLLAMA_MODEL,
+        response = client.chat.completions.create(
+            model=model,
             messages=messages,
             tools=TOOLS_OPENAI,
             tool_choice="auto",
@@ -195,7 +202,6 @@ def _run_ollama(task: str, log, browser: BrowserController, prompt: str = None) 
         msg = response.choices[0].message
         finish = response.choices[0].finish_reason
 
-        # Build serialisable assistant entry
         assistant_entry: dict = {"role": "assistant", "content": msg.content or ""}
         if msg.tool_calls:
             assistant_entry["tool_calls"] = [
@@ -298,144 +304,6 @@ def _run_anthropic(task: str, log, browser: BrowserController, prompt: str = Non
 
 
 # ---------------------------------------------------------------------------
-# Google Gemini agent loop
-# ---------------------------------------------------------------------------
-
-def _run_google(task: str, log, browser: BrowserController, prompt: str = None) -> str:
-    """Run the agent using Google Gemini with function-calling."""
-    import google.generativeai as genai
-
-    # Build tool declarations for Gemini
-    gemini_tools = genai.protos.Tool(
-        function_declarations=[
-            genai.protos.FunctionDeclaration(
-                name="navigate",
-                description="Navigate the browser to a URL.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"url": genai.protos.Schema(type=genai.protos.Type.STRING)},
-                    required=["url"],
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="read_page",
-                description="Read the current page content and URL.",
-                parameters=genai.protos.Schema(type=genai.protos.Type.OBJECT, properties={}),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="fill_input",
-                description="Fill a text input identified by its label or placeholder.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={
-                        "label_or_placeholder": genai.protos.Schema(type=genai.protos.Type.STRING),
-                        "value": genai.protos.Schema(type=genai.protos.Type.STRING),
-                    },
-                    required=["label_or_placeholder", "value"],
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="select_option",
-                description="Select a dropdown option by label and value.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={
-                        "label": genai.protos.Schema(type=genai.protos.Type.STRING),
-                        "value": genai.protos.Schema(type=genai.protos.Type.STRING),
-                    },
-                    required=["label", "value"],
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="click_button",
-                description="Click a button by its visible text.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"text": genai.protos.Schema(type=genai.protos.Type.STRING)},
-                    required=["text"],
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="click_link",
-                description="Click a link by its visible text.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"text": genai.protos.Schema(type=genai.protos.Type.STRING)},
-                    required=["text"],
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="task_complete",
-                description="Call when the task is fully completed.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"summary": genai.protos.Schema(type=genai.protos.Type.STRING)},
-                    required=["summary"],
-                ),
-            ),
-        ]
-    )
-
-    model = genai.GenerativeModel(
-        model_name="gemini-pro",
-        system_instruction=prompt or SYSTEM_PROMPT,
-        tools=[gemini_tools],
-    )
-    chat = model.start_chat(enable_automatic_function_calling=False)
-    result = "Task could not be completed."
-
-    chat.send_message(task)
-
-    for _ in range(25):
-        response = chat.history[-1]
-        # Find function calls in the last model turn
-        fn_calls = []
-        text_parts = []
-        for part in response.parts:
-            if part.function_call.name:
-                fn_calls.append(part.function_call)
-            elif part.text:
-                text_parts.append(part.text)
-
-        if text_parts:
-            log("THINK", " ".join(text_parts))
-
-        if not fn_calls:
-            result = " ".join(text_parts) or "Task completed."
-            log("DONE", result)
-            break
-
-        # Execute tools and send results back
-        tool_responses = []
-        for fc in fn_calls:
-            name = fc.name
-            args = dict(fc.args)
-            log("TOOL", f"{name}({args})")
-
-            if name == "task_complete":
-                result = args.get("summary", "Task completed.")
-                log("COMPLETE", result)
-                return result
-
-            tool_result = _execute_tool(browser, name, args)
-            short = tool_result[:300] + "..." if len(tool_result) > 300 else tool_result
-            log("RESULT", short)
-
-            tool_responses.append(
-                genai.protos.Part(
-                    function_response=genai.protos.FunctionResponse(
-                        name=name,
-                        response={"result": tool_result},
-                    )
-                )
-            )
-
-        response = chat.send_message(tool_responses)
-
-    return result
-
-
-# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -445,14 +313,6 @@ def run_agent(
     system_prompt: Optional[str] = None,
     start_url: Optional[str] = None,
 ) -> str:
-    """Run the IT agent.
-
-    Args:
-        task: Natural-language IT task description.
-        progress_callback: Optional (step, message) callback for streaming progress.
-        system_prompt: Override the default system prompt (used by SaaS mode).
-        start_url: Navigate to this URL before starting (used by SaaS mode).
-    """
     def log(step: str, message: str):
         print(f"[{step}] {message}")
         if progress_callback:
@@ -461,7 +321,7 @@ def run_agent(
     if _USE_ANTHROPIC:
         backend = "Anthropic (claude-sonnet-4-6)"
     elif _USE_GOOGLE:
-        backend = "Google Gemini (gemini-pro)"
+        backend = f"Google Gemini ({_GOOGLE_MODEL})"
     else:
         backend = f"Ollama ({OLLAMA_MODEL})"
     log("START", f"Task: {task}  |  Backend: {backend}")
@@ -473,9 +333,9 @@ def run_agent(
         if _USE_ANTHROPIC:
             return _run_anthropic(task, log, browser, system_prompt)
         elif _USE_GOOGLE:
-            return _run_google(task, log, browser, system_prompt)
+            return _run_openai_compatible(_google_client, _GOOGLE_MODEL, task, log, browser, system_prompt)
         else:
-            return _run_ollama(task, log, browser, system_prompt)
+            return _run_openai_compatible(_ollama_client, OLLAMA_MODEL, task, log, browser, system_prompt)
     except Exception as e:
         log("ERROR", str(e))
         return f"Error: {e}"
