@@ -25,7 +25,7 @@ elif LLM_BACKEND == "google" and GOOGLE_API_KEY:
     import google.generativeai as genai
     genai.configure(api_key=GOOGLE_API_KEY)
     _gemini_model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-pro",
         system_instruction=SYSTEM_PROMPT,
     )
     _USE_GOOGLE = True
@@ -377,7 +377,7 @@ def _run_google(task: str, log, browser: BrowserController, prompt: str = None) 
     )
 
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-pro",
         system_instruction=prompt or SYSTEM_PROMPT,
         tools=[gemini_tools],
     )
@@ -461,7 +461,7 @@ def run_agent(
     if _USE_ANTHROPIC:
         backend = "Anthropic (claude-sonnet-4-6)"
     elif _USE_GOOGLE:
-        backend = "Google Gemini (gemini-1.5-flash)"
+        backend = "Google Gemini (gemini-pro)"
     else:
         backend = f"Ollama ({OLLAMA_MODEL})"
     log("START", f"Task: {task}  |  Backend: {backend}")
