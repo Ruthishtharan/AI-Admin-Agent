@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}AI Agent - IT Admin Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>AI IT Agent</h2>
+  <p>Describe an IT task in plain English &mdash; the AI agent will handle it in the browser</p>
+</div>
+
+<div class="chat-container">
+  <div class="card" style="margin-bottom:16px">
+    <p style="font-size:13px;font-weight:600;color:#555;margin-bottom:10px">Example tasks:</p>
+    <div class="chip-row">
+      <span class="chip" onclick="setTask('Create a new user named Alice Chen with email alice.chen@company.com in the Engineering department')">Create new user</span>
+      <span class="chip" onclick="setTask('Reset the password for john.doe@company.com')">Reset password</span>
+      <span class="chip" onclick="setTask('Disable the account for bob.johnson@company.com')">Disable account</span>
+      <span class="chip" onclick="setTask('Enable the account for bob.johnson@company.com')">Enable account</span>
+      <span class="chip" onclick="setTask('Check if alice.chen@company.com exists, if not create them with role employee, then assign Microsoft 365 E3 license')">Conditional create &amp; assign license</span>
+      <span class="chip" onclick="setTask('Assign the Microsoft 365 E5 license to sarah.lee@company.com')">Assign license</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chat-box" id="chatBox">
+      <div class="chat-msg system">
+        <span class="role">System: </span>
+        <span>Ready. Enter an IT request below and the AI agent will execute it using the browser.</span>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="taskInput"
+        placeholder="e.g. Reset password for john.doe@company.com"
+        onkeypress="if(event.key==='Enter') sendTask()">
+      <button class="btn btn-primary" onclick="sendTask()" id="sendBtn">Run Task</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function setTask(text) {
+  document.getElementById('taskInput').value = text;
+  document.getElementById('taskInput').focus();
+}
+
+function appendMsg(role, text, cssClass) {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + cssClass;
+  const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  div.innerHTML = '<span class="role">' + role + ': </span><span>' + safeText + '</span>';
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendTask() {
+  const input = document.getElementById('taskInput');
+  const btn   = document.getElementById('sendBtn');
+  const task  = input.value.trim();
+  if (!task) return;
+
+  input.disabled = true;
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  appendMsg('You', task, 'user');
+  appendMsg('Agent', 'Starting task — browser is opening...', 'system');
+
+  try {
+    const res  = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task})
+    });
+    const data = await res.json();
+
+    if (data.steps) {
+      data.steps.forEach(s => {
+        if (s.step !== 'START') appendMsg(s.step, s.message, 'system');
+      });
+    }
+
+    if (data.success) {
+      appendMsg('Done', '✅ ' + data.result, 'agent');
+    } else {
+      appendMsg('Error', '❌ ' + (data.error || 'Task failed'), 'error');
+    }
+    input.value = '';
+  } catch (err) {
+    appendMsg('Error', '❌ ' + err.message, 'error');
+  } finally {
+    input.disabled = false;
+    btn.disabled = false;
+    btn.textContent = 'Run Task';
+    input.focus();
+  }
+}
+</script>
+{% endblock %}

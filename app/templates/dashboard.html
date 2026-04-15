@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - IT Admin Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Dashboard</h2>
+  <p>IT Admin Panel &mdash; User Management Overview</p>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Users</div>
+    <div class="stat-value">{{ stats.total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Active</div>
+    <div class="stat-value green">{{ stats.active }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Inactive</div>
+    <div class="stat-value red">{{ stats.inactive }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Admins</div>
+    <div class="stat-value orange">{{ stats.admins }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="topbar">
+    <h3 style="font-size:15px;font-weight:700;">Recent Users</h3>
+    <a href="/users" class="btn btn-outline btn-sm">View All Users</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Role</th>
+          <th>Department</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in recent_users %}
+        <tr>
+          <td><strong>{{ user.name }}</strong></td>
+          <td style="color:#555">{{ user.email }}</td>
+          <td>
+            {% if user.status == 'active' %}
+            <span class="badge badge-success">Active</span>
+            {% else %}
+            <span class="badge badge-danger">Inactive</span>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-info">{{ user.role | capitalize }}</span></td>
+          <td style="color:#666">{{ user.department or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

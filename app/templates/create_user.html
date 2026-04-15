@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Create User - IT Admin Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Create User</h2>
+  <p>Add a new user account to the system</p>
+</div>
+
+<div class="card" style="max-width:560px">
+  <form method="POST">
+    <div class="form-group">
+      <label for="name">Full Name</label>
+      <input type="text" id="name" name="name" placeholder="Enter full name" required>
+    </div>
+    <div class="form-group">
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" placeholder="Enter email address" required>
+    </div>
+    <div class="form-group">
+      <label for="role">Role</label>
+      <select id="role" name="role">
+        <option value="employee">Employee</option>
+        <option value="admin">Admin</option>
+        <option value="contractor">Contractor</option>
+        <option value="guest">Guest</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="department">Department</label>
+      <input type="text" id="department" name="department" placeholder="e.g. Engineering, Marketing, HR">
+    </div>
+    <div class="form-group">
+      <label for="license">License</label>
+      <select id="license" name="license">
+        <option value="None">None</option>
+        <option value="Microsoft 365 E1">Microsoft 365 E1</option>
+        <option value="Microsoft 365 E3">Microsoft 365 E3</option>
+        <option value="Microsoft 365 E5">Microsoft 365 E5</option>
+        <option value="Google Workspace Basic">Google Workspace Basic</option>
+        <option value="Google Workspace Business">Google Workspace Business</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:24px">
+      <button type="submit" class="btn btn-primary">Create User</button>
+      <a href="/users" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

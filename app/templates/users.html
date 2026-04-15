@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Users - IT Admin Panel{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div class="page-header" style="margin-bottom:0">
+    <h2>Users</h2>
+    <p>{{ users | length }} total user{{ 's' if users | length != 1 }}</p>
+  </div>
+  <a href="/create-user" class="btn btn-primary">+ Create User</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Role</th>
+          <th>Department</th>
+          <th>License</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td><strong>{{ user.name }}</strong></td>
+          <td style="color:#555;font-size:13px">{{ user.email }}</td>
+          <td>
+            {% if user.status == 'active' %}
+            <span class="badge badge-success">Active</span>
+            {% else %}
+            <span class="badge badge-danger">Inactive</span>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-info">{{ user.role | capitalize }}</span></td>
+          <td style="color:#666;font-size:13px">{{ user.department or '—' }}</td>
+          <td style="color:#666;font-size:12px">{{ user.license or 'None' }}</td>
+          <td>
+            <div class="action-btns">
+              <a href="/reset-password/{{ user.email }}" class="btn btn-warning btn-sm">Reset Password</a>
+              {% if user.status == 'active' %}
+              <a href="/disable-user/{{ user.email }}" class="btn btn-outline btn-sm">Disable</a>
+              {% else %}
+              <a href="/enable-user/{{ user.email }}" class="btn btn-success btn-sm">Enable</a>
+              {% endif %}
+              <a href="/assign-license/{{ user.email }}" class="btn btn-outline btn-sm">Edit Role</a>
+              <a href="/delete-user/{{ user.email }}" class="btn btn-danger btn-sm">Delete</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not users %}
+        <tr>
+          <td colspan="7" style="text-align:center;color:#999;padding:48px;font-size:14px">
+            No users found. <a href="/create-user" style="color:#4361ee">Create one</a>.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
