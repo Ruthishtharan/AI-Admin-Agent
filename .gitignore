@@ -22,3 +22,13 @@ env/
 # IDE
 .vscode/
 .idea/
+
+# Runtime data — SQLite databases and auth files (generated at startup)
+data/users.db
+data/pin.json
+data/profile.json
+data/webauthn.json
+admin_panel/data/
+
+# Empty placeholder
+app.py
